@@ -1,4 +1,4 @@
-from constraints import Connector, Adder, Multiplier, Constant
+from constraints import Connector, Adder, Multiplier, Constant, Square
 
 # Defines a conversion network.
 def temperature_converter(c,f):
@@ -22,5 +22,12 @@ temperature_converter(c,f)
 c.show_updates = True
 f.show_updates = True
 c.set_value(100, "user")
-f.set_value(123, "user")
+#f.set_value(123, "user")
 c.forget("user")
+
+a = Connector("A")
+b = Connector("B")
+a.show_updates = True
+b.show_updates = True
+Square(a,b)
+b.set_value(100, "derp")

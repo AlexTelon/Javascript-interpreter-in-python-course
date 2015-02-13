@@ -1,3 +1,4 @@
+import math
 """ SICP Constraint system, Python version.
 
 Translated from R6RS Scheme in 2015."""
@@ -112,8 +113,31 @@ class Multiplier:
     self.m2.forget(self)
     self.process()
 
-   
+class Square:
+  def __init__(self, m1_, m2_, name_ = "anonymous square"):
+    self.m1 = m1_
+    self.m2 = m2_
+    self.name = name_
+    m1_.connect(self)
+    m2_.connect(self)
+  
+  def process(self):
+    m1, m2 = self.m1, self.m2
     
+    if m1.has_value() and m1.value == 0 or \
+       m2.has_value() and m2.value == 0:
+      sqr.set_value(0, self)
+    elif m1.has_value():
+      m2.set_value(m1.value * m1.value, self)
+    elif m2.has_value():
+      m1.set_value(math.sqrt(m2.value), self)
+      pass
+
+  
+  def forget(self):
+    self.m1.forget(self)
+    self.m2.forget(self)
+    self.process()
 
 
 """ Test case"""
