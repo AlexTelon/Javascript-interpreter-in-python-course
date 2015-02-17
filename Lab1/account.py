@@ -7,7 +7,7 @@ class AccountError(Exception):
 def make_account(balance, interest):
   lastTime = 0;
   def withdraw(amount, time):
-    nonlocal balance
+    nonlocal balance, lastTime
     balance = get_balance(time);
     lastTime = time
     if balance >= amount:
@@ -16,16 +16,19 @@ def make_account(balance, interest):
       raise AccountError("Account balance too low")
       
   def deposit(amount, time):
-    nonlocal balance
+    nonlocal balance, lastTime
     balance = get_balance(time) + amount
     lastTime = time
   
   def get_value(time):
-    return get_balance(time)
+    nonlocal lastTime
+    tmp = get_balance(time)
+    lastTime = time
+    return tmp
 
   #lazy implementation
   def get_balance(time):
-    nonlocal balance, interest
+    nonlocal balance
     balance = balance+balance*(time-lastTime)*interest
     return balance
   
