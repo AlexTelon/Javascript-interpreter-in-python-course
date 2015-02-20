@@ -57,8 +57,9 @@ def product(term, lower, succ, upper):
     return accumulate((lambda x,y: x*y), 1, term, lower, succ, upper)
 print(product((lambda n:n), 1, (lambda n:n+1), 10));
 print("1.3 c")
-# it must be symmetric! Division is one that wont work.
-# below works for uneven numbers but not even numbers, there they differ.
+# it must be associative so addition works since a + (b + c) = (a + b) + c.
+# Division is one that wont work.
+# below is an example which works for uneven numbers but not even numbers, there they differ.
 print(accumulate((lambda x,y: x/y),1,(lambda n:n), 1, (lambda n:n+1), 2))
 print(accumulate_iter((lambda x,y: x/y),1,(lambda n:n), 1, (lambda n:n+1), 2))
 

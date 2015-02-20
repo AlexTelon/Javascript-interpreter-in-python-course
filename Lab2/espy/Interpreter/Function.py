@@ -1,5 +1,5 @@
 from Interpreter.Environment import Environment
-
+#DOES NOT WORK FOR TWO BASTARD CASES IN THE TEST, REMEMBEER TO ASK ABOUT THIS!
 class Function:
   '''
   This class represent a JavaScript function. It is a callable python object.
@@ -22,7 +22,14 @@ class Function:
     This creates a new function with a set of args (which is an array of string with the name of the variables used as arguments), the global environment
     used when defining the function and a lambda function defining the body to be called (should take one single argument, which is the environment)
     '''
-    pass
+    self.args = args
+    self.environment = Environment(environment);
+    self.environment.defineVariable("this")
+    for arg in args:
+#      print("defining variable: ", arg)
+      self.environment.defineVariable(arg)
+    self.body = body
+
   def call(self, that, this, *args):
     '''
     Call the function. This function is usefull since in ECMAScript, a function is an object and it can be called with the function "call". For instance:
@@ -41,15 +48,29 @@ class Function:
     In which case that contains obj.member and this contains obj.
     
     In practice, the that argument can be ignored.
-    
     In other word:
     * that is the pointer to the object of the function
     * this is the pointer to the object (equivalent of self in python)
     * args is the list of arguments passed to the function
     '''
-    pass
+
+    self.environment.setVariable("this", this)
+    i = 0
+    for arg in args:
+      self.environment.setVariable(self.args[i], arg)
+#      print("setting variable: ", arg)
+      i = i + 1;
+    
+    self.body(self.environment)
+
   def __call__(self, this, *args):
     '''
     Call the function. With the this argument.
     '''
-    pass
+    self.environment.setVariable("this", this)
+    i = 0
+    for arg in args:
+      self.environment.setVariable(self.args[i], arg)
+      i = i + 1;
+    
+    return self.body(self.environment)

@@ -10,14 +10,14 @@ class Environment:
     where value for variables can be looked up recursively.
     """
     self.parent = parent;
-    self.valueDict = None;
+    self.valueDict = {};
 
   def defineVariable(self, name, init = None):
     """
     Create a new variable with the name "name" and the initial value
     "init".
     """
-    self.valueDict[name] = value;
+    self.valueDict[name] = init;
 
 
   def setVariable(self, name, value):
@@ -29,7 +29,7 @@ class Environment:
     """
     if (name in self.valueDict):
       self.valueDict[name] = value;
-    if (parent != None):
+    elif (self.parent != None):
       self.parent.setVariable(name, value)
     else:
       raise UnknownVariable(name)
@@ -45,7 +45,7 @@ class Environment:
     """
     if (name in self.valueDict):
       return self.valueDict[name]
-    if (parent != None):
-      self.parent.value(name)
+    elif (self.parent != None):
+     return self.parent.value(name)
     else:
       raise UnknownVariable(name)
