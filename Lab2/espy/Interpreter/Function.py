@@ -1,5 +1,4 @@
 from Interpreter.Environment import Environment
-#DOES NOT WORK FOR TWO BASTARD CASES IN THE TEST, REMEMBEER TO ASK ABOUT THIS!
 class Function:
   '''
   This class represent a JavaScript function. It is a callable python object.
@@ -26,7 +25,6 @@ class Function:
     self.environment = Environment(environment);
     self.environment.defineVariable("this")
     for arg in args:
-#      print("defining variable: ", arg)
       self.environment.defineVariable(arg)
     self.body = body
 
@@ -58,7 +56,6 @@ class Function:
     i = 0
     for arg in args:
       self.environment.setVariable(self.args[i], arg)
-#      print("setting variable: ", arg)
       i = i + 1;
     
     self.body(self.environment)
