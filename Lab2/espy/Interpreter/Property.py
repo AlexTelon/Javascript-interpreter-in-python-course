@@ -4,15 +4,15 @@ class ReadOnlyException(Exception):
   '''
   Exception thrown when accessing a read only property
   '''
-  def __init__(self):
-    super().__init__("U has no getter, stupid!")
+  def __init__(self, message):
+    super().__init__("ReadOnlyException: ", message)
 
 class WriteOnlyException(Exception):
   '''
   Exception thrown when accessing a write only property
   '''
-  def __init__(self):
-    super().__init__("U has no setter fool!")
+  def __init__(self, message):
+    super().__init__("WriteOnlyException: ", message)
 
 class Property:
   '''
@@ -31,7 +31,7 @@ class Property:
     Get the value or raise WriteOnlyException
     '''
     if (self.getter == None):
-      raise WriteOnlyException()
+      raise WriteOnlyException("Getter is no set")
     else:
       return self.getter(self.this);
     
@@ -40,7 +40,7 @@ class Property:
     Set the value or raise ReadOnlyException
     '''
     if (self.setter == None):
-      raise ReadOnlyException()
+      raise ReadOnlyException("Setter is not set")
     else:
      return self.setter(self.this, value)
  
