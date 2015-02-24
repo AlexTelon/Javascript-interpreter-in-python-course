@@ -108,7 +108,12 @@ sq_twice = repeat(sq,2)
 print sq_twice(5)
 
 print("uppgift 1.5 b");
-#the input type has to be the same as the output type.
+#the input type (for f) has to be the same as the output type (for f)
+# The domain = range for f
+# f : X -> Y
+# domain of X == image of Y
+# {types and values X can be} == {types and values Y can be}
+
 print("uppgift 1.5 c");
 
 def compose(f, g):
@@ -143,7 +148,9 @@ print (smooth(smooth(smooth(smooth(smooth(sq))))))(4)
 print five__smoothed_square(4)
 
 print("#################DEL 2######################")
-# 2.1 - applicative will crash. normal will expand and depending on if its satisfied with the function call only then everything will be fine, but if it will try to find its definition when expanding then it will crash too.
+# 2.1 - 
+# Applicative will crash. - Maximum recursion depth exceeded
+# Normal order will not evaluate f() since it is never used and hence wont crash.
 
 print("2.2")
 x = 10
