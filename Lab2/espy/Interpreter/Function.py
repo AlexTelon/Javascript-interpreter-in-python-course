@@ -58,7 +58,7 @@ class Function:
       self.environment.setVariable(self.args[i], arg)
       i = i + 1;
     
-    self.body(self.environment)
+    return self.body(self.environment)
 
   def __call__(self, this, *args):
     '''
