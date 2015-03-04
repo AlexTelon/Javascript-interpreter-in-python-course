@@ -1,0 +1,4 @@
+John
+Doe
+50.0
+blue
