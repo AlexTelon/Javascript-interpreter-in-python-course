@@ -49,7 +49,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#assignmentOperator.
     def visitAssignmentOperator(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        return ctx.children[0].symbol.type
 
 
     # Visit a parse tree produced by ECMAScriptParser#eos.
@@ -153,13 +153,21 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#initialiser.
     def visitInitialiser(self, ctx):
+        # a = 10 (I think)
         #print("initialiser skipping", ctx.children[0].symbol.text)
-        return float(ctx.children[1].accept(self))
+        return ctx.children[1].accept(self)
 
 
     # Visit a parse tree produced by ECMAScriptParser#statementList.
     def visitStatementList(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        # a bunch of statements with ; between like:
+        # var a = 10;
+        # var b = 20; and so on...
+        args = []
+        for c in ctx.children:
+            if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
+                args.append(c.accept(self))
+        return args
 
 
     # Visit a parse tree produced by ECMAScriptParser#PropertyGetter.
@@ -169,12 +177,8 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#block.
     def visitBlock(self, ctx):
-        printCtx(ctx)
-        derp, break here
-        print("we are here now, take a look at 02_block.js");
-        # TODO
-        raise Utils.UnimplementedVisitorException(ctx)
-
+        # { stuff }, so ignore children[0] and children[2]
+        return ctx.children[1].accept(self)
 
     # Visit a parse tree produced by ECMAScriptParser#expressionStatement.
     def visitExpressionStatement(self, ctx):
@@ -195,12 +199,12 @@ class InterpreterVisitor(ECMAScriptVisitor):
     def visitNumericLiteral(self, ctx):
         if(isinstance(ctx.children[0], antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
             if(ctx.children[0].symbol.type == 56):
-                return eval(ctx.children[0].symbol.text) + 0.0
+                return float(eval(ctx.children[0].symbol.text))
             if(ctx.children[0].symbol.type == 57):
-                return eval(ctx.children[0].symbol.text) + 0.0
+                return float(eval(ctx.children[0].symbol.text))
             if(ctx.children[0].symbol.type == 55):
-                return eval(ctx.children[0].symbol.text)
-                
+                return float(eval(ctx.children[0].symbol.text))
+
         return ctx.children[0].accept(self)
 
 
@@ -230,7 +234,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#LiteralExpression.
     def visitLiteralExpression(self, ctx):
-      return self.visitChildren(ctx)
+        return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by ECMAScriptParser#ArrayLiteralExpression.
@@ -262,24 +266,53 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#incrementOperator.
     def visitIncrementOperator(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
-
+        return ctx.children[0].symbol.type
 
     # Visit a parse tree produced by ECMAScriptParser#AssignmentOperatorExpression.
     def visitAssignmentOperatorExpression(self, ctx):
         #print("AssignmentOperatorExpression")
         # a = 1 for example, where = and 1 are lists
-        name = ctx.children[0].symbol.text
+        type = ctx.children[1].accept(self)
+        name = ctx.children[0].accept(self)
         value = ctx.children[2].accept(self)
-        self.environment.setVariable(name, value)
-        # JavaScript returns the value of an assignment
-        return value
+        oldVal = self.environment.value(name)
+        
+        if(type == 11): # =
+            self.environment.setVariable(name, value)
+            # JavaScript returns the value of an assignment
+            return value
+        if(type == 43): # +=
+            newVal = oldVal+value
+            self.environment.setVariable(name, newVal)
+            return newVal
+        if(type == 44): # -=
+            newVal = oldVal-value
+            self.environment.setVariable(name, newVal)
+            return newVal
+        if(type == 40): # *=
+            newVal = oldVal*value
+            self.environment.setVariable(name, newVal)
+            return newVal
+        if(type == 41): # /=
+            newVal = oldVal/value
+            self.environment.setVariable(name, newVal)
+            return newVal
+            
+            
 
 
     # Visit a parse tree produced by ECMAScriptParser#PostUnaryAssignmentExpression.
     def visitPostUnaryAssignmentExpression(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
-
+        #name first
+        name = ctx.children[0].symbol.text
+        value = self.environment.value(name)
+        type = ctx.children[1].accept(self);
+        if(type == 15): # ++
+            self.environment.setVariable(name, value+1)
+            return value;
+        if(type == 16): # --
+            self.environment.setVariable(name, value-1)
+            return value;
 
     # Visit a parse tree produced by ECMAScriptParser#TernaryExpression.
     def visitTernaryExpression(self, ctx):
@@ -324,11 +357,13 @@ class InterpreterVisitor(ECMAScriptVisitor):
     # Visit a parse tree produced by ECMAScriptParser#UnaryExpression.
     def visitUnaryExpression(self, ctx):
         if(ctx.children[0].symbol.type == 18): # -
-            return -ctx.children[1].accept(self) + 0.0
+            return -ctx.children[1].accept(self)
         if(ctx.children[0].symbol.type == 17): # +
-            return ctx.children[1].accept(self) + 0.0
+            return ctx.children[1].accept(self)
         if(ctx.children[0].symbol.type == 19): # ~
-            return ~ctx.children[1].accept(self) + 0.0
+            #print("hest")
+            #return "felfelfel"
+            return float(~int(ctx.children[1].accept(self)))
         if(ctx.children[0].symbol.type == 20): # !
             return not(ctx.children[1].accept(self))
 
@@ -368,7 +403,6 @@ class InterpreterVisitor(ECMAScriptVisitor):
                 return None
             # TODO - fix for regularExpressionLiteral=1
         return child.accept(self)
-
 
 
     # Visit a parse tree produced by ECMAScriptParser#variableStatement.
@@ -484,6 +518,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
     def visitVariableDeclarationList(self, ctx):
         #print("variableDeclarationList: ")
         # stuff like a = 10, b = 20
+        #        printCtx(ctx)
         for c in ctx.children:
             if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
                 #print("variableDeclartionList")
@@ -503,6 +538,15 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#UnaryAssignmentExpression.
     def visitUnaryAssignmentExpression(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
-
-
+        #operator first
+        name = ctx.children[1].symbol.text
+        value = self.environment.value(name)
+        type = ctx.children[0].accept(self);
+        if(type == 15): # ++
+            value = value + 1
+            self.environment.setVariable(name, value)
+            return value;
+        if(type == 16): # --
+            value = value - 1
+            self.environment.setVariable(name, value)
+            return value;
