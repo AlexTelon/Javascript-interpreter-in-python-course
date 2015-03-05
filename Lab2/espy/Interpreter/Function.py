@@ -22,10 +22,7 @@ class Function:
     used when defining the function and a lambda function defining the body to be called (should take one single argument, which is the environment)
     '''
     self.args = args
-    self.environment = Environment(environment);
-    self.environment.defineVariable("this")
-    for arg in args:
-      self.environment.defineVariable(arg)
+    self.parentEnv = environment
     self.body = body
 
   def call(self, that, this, *args):
@@ -52,7 +49,12 @@ class Function:
     * args is the list of arguments passed to the function
     '''
 
-    self.environment.setVariable("this", this)
+    self.environment = Environment(self.parentEnv)
+    self.environment.defineVariable("this", this)
+    for arg in self.args:
+      self.environment.defineVariable(arg)
+
+    self.environment.defineVariable("that", that)
     i = 0
     for arg in args:
       self.environment.setVariable(self.args[i], arg)
@@ -64,7 +66,12 @@ class Function:
     '''
     Call the function. With the this argument.
     '''
-    self.environment.setVariable("this", this)
+
+    self.environment = Environment(self.parentEnv)
+    self.environment.defineVariable("this", this)
+    for arg in self.args:
+      self.environment.defineVariable(arg)
+
     i = 0
     for arg in args:
       self.environment.setVariable(self.args[i], arg)
