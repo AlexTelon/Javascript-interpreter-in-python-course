@@ -51,14 +51,12 @@ class Function:
 
     self.environment = Environment(self.parentEnv)
     self.environment.defineVariable("this", this)
+    i = 0
     for arg in self.args:
-      self.environment.defineVariable(arg)
+      self.environment.defineVariable(arg, args[i])
+      i = i + 1
 
     self.environment.defineVariable("that", that)
-    i = 0
-    for arg in args:
-      self.environment.setVariable(self.args[i], arg)
-      i = i + 1;
     
     return self.body(self.environment)
 
@@ -69,12 +67,9 @@ class Function:
 
     self.environment = Environment(self.parentEnv)
     self.environment.defineVariable("this", this)
-    for arg in self.args:
-      self.environment.defineVariable(arg)
-
     i = 0
-    for arg in args:
-      self.environment.setVariable(self.args[i], arg)
-      i = i + 1;
+    for arg in self.args:
+      self.environment.defineVariable(arg, args[i])
+      i = i + 1
     
     return self.body(self.environment)
