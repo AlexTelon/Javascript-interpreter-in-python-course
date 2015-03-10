@@ -1,7 +1,6 @@
 import antlr4
 import Utils
-
-
+from Interpreter.ControlExceptions import BreakException, ContinueException, ReturnException
 
 from ECMAScriptParser import ECMAScriptVisitor
 
@@ -13,7 +12,7 @@ from Interpreter.Object import Object, ObjectModule
 def printCtx(ctx, level=4, tab="", path="ctx"):
     if (True):
         #print(tab, "Entering ctx")
-        print(tab, "Nr of children: ", ctx.getChildCount())
+        print(tab,"list with of ", ctx.getChildCount(), " elements")
         num = -1;
         if (ctx.children != None):
             for c in ctx.children:
@@ -22,12 +21,26 @@ def printCtx(ctx, level=4, tab="", path="ctx"):
                 if(isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)):
                     print(tab, path_, " is ", c.symbol.text)
                 else:
+                    print(tab, path_, " is list ->")
                     if (level > 0):
                         printCtx(c, level-1, tab + "   ", path_)
                     else:
                         print(tab, "children: ", c)
         print("")
-                    
+            
+
+def sPrintCtx(ctx):
+    num = -1;
+    if (ctx.children != None):
+            for c in ctx.children:
+                num = num + 1
+                path_ = "ctx.children[" + str(num) + "]"
+                if(isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)):
+                    print(path_, " is ", c.symbol.text)
+                else:
+                    print(path_, " is ", c)
+    print("")
+    
 
 
 class InterpreterVisitor(ECMAScriptVisitor):
@@ -331,7 +344,14 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#DoStatement.
     def visitDoStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        #printCtx(ctx)
+        # [0] = do, [1] = block, [2] = while, [3] = (, [4] = condition, [5] = )
+        ctx.children[1].accept(self)
+
+        while ctx.children[4].accept(self):
+            ctx.children[1].accept(self)
+
+        
 
 
     # Visit a parse tree produced by ECMAScriptParser#ObjectLiteralExpression.
@@ -369,7 +389,15 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#WhileStatement.
     def visitWhileStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        # [0] = while, (, condition, ), [4] = block
+
+        while ctx.children[2].accept(self):
+            try:
+                ctx.children[4].accept(self)
+            except BreakException:
+                break
+            except ContinueException:
+                continue
 
 
     # Visit a parse tree produced by ECMAScriptParser#returnStatement.
@@ -379,6 +407,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#switchStatement.
     def visitSwitchStatement(self, ctx):
+        sPrintCtx(ctx)
         raise Utils.UnimplementedVisitorException(ctx)
 
     # Visit a parse tree produced by ECMAScriptParser#expressionSequence.
@@ -431,7 +460,59 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#ForStatement.
     def visitForStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        #printCtx(ctx)
+        #sPrintCtx(ctx)
+        # [0] = for, [1] = (, [2] = assignment/starting value, [3] = ;, 
+        # [4] = end condition, [5] = ; , [6] = change of var or whatever
+        # [7] = ), [8] = block
+        # The above is if the for loop is full, it could be for (;;) {...}
+        # as well, so the code below is made to make sure it works no matter what
+        child = 2
+        
+        if ctx.children[child].accept(self) == "var":
+            child = child + 1
+        if ctx.children[child].accept(self) != ";":
+            child = child + 1
+        child = child + 1
+
+        condition = ctx.children[child].accept(self)
+        if condition == ";":
+            condition = True
+        else: # if condition is valid, we want to save the "pointer" to it
+            condition = ctx.children[child]
+            child = child + 1
+        child = child + 1
+
+        if isinstance(ctx.children[child], antlr4.tree.Tree.TerminalNodeImpl):
+            varChange = None
+            child = child + 1
+        else:
+            # "pointer"
+            varChange = ctx.children[child]
+            child = child + 2
+            
+
+        #saving the "pointer" to the block
+        block = ctx.children[child]
+        if condition == True:
+            while True:
+                try:
+                    block.accept(self)
+                except BreakException:
+                    break
+                except ContinueException:
+                    pass
+                varChange.accept(self)                    
+        else:
+            while condition.accept(self):
+                try:
+                    block.accept(self)
+                except BreakException:
+                    break
+                except ContinueException:
+                    pass
+                varChange.accept(self)                    
+
 
 
     # Visit a parse tree produced by ECMAScriptParser#caseBlock.
@@ -456,12 +537,17 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#breakStatement.
     def visitBreakStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        raise BreakException()
 
 
     # Visit a parse tree produced by ECMAScriptParser#ifStatement.
     def visitIfStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        # ctx.children[0] = "if", ctx.children[1] = "(", ctx.children[3] = ")", ctx.children[4] = stuff to run
+        #if there is an else it is in [5] and what is to be run in [6]
+        if ctx.children[2].accept(self):
+            return ctx.children[4].accept(self)
+        if ctx.getChildCount() >= 7:
+            return ctx.children[6].accept(self)
 
 
     # Visit a parse tree produced by ECMAScriptParser#reservedWord.
@@ -501,7 +587,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#continueStatement.
     def visitContinueStatement(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        raise ContinueException()
 
 
     # Visit a parse tree produced by ECMAScriptParser#caseClause.
