@@ -14,3 +14,10 @@ class ReturnException(Exception):
   '''
   def __init__(self, value):
     self.value = value
+
+class ThrowException(Exception):
+  '''
+  If U throw then U thow this
+  '''
+  def __init__(self,msg):
+    self.msg = msg
