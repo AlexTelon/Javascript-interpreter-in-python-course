@@ -134,16 +134,16 @@ class InterpreterVisitor(ECMAScriptVisitor):
     def visitBinaryExpression(self, ctx):
         # numeric returns
         if(ctx.children[1].symbol.type == 17): # +
-            return ctx.children[0].accept(self) + ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) + ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 18): # -
-            return ctx.children[0].accept(self) - ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) - ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 21): # *
-            return ctx.children[0].accept(self) * ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) * ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 22): # /
             # divide by 0?
-            return ctx.children[0].accept(self) / ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) / ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 23): # *
-            return ctx.children[0].accept(self) % ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) % ctx.children[2].accept(self)
 
         # boolean returns
         # TODO - ask if stuff will crash if we dont check for types in === and such
@@ -173,11 +173,11 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
 
         if(ctx.children[1].symbol.type == 35): # &
-            return ctx.children[0].accept(self) & ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) & ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 36): # ^
-            return ctx.children[0].accept(self) ^ ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) ^ ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 37): # |
-            return ctx.children[0].accept(self) | ctx.children[2].accept(self) + 0.0
+            return ctx.children[0].accept(self) | ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 38): # &&
             return ctx.children[0].accept(self) and ctx.children[2].accept(self)
         if(ctx.children[1].symbol.type == 39): # ||
@@ -280,7 +280,22 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#NewExpression.
     def visitNewExpression(self, ctx):
-        raise Utils.UnimplementedVisitorException(ctx)
+        dprint("visitNewExpression")
+        #printCtx(ctx,2)
+
+        this = ObjectModule()
+        #print("this: ", this)
+        func = ctx.children[1].accept(self) #Object
+        #print("func: ", func)
+        parameters = ctx.children[2].accept(self) #()
+        #print("Parameters: ", parameters)
+        if parameters != None:
+            func(this, *parameters)
+        return this
+            
+
+
+
 
 
     # Visit a parse tree produced by ECMAScriptParser#LiteralExpression.
@@ -295,11 +310,18 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#MemberDotExpression.
     def visitMemberDotExpression(self, ctx):
-      obj    = ctx.children[0].accept(self)
-      member = ctx.children[2].accept(self)
-      #print("obj: ", obj)
-      #print("member: ", member)
-      return getattr(obj, member)
+        print("visitMemberDotExpression")
+        printCtx(ctx,3)
+        obj    = ctx.children[0].accept(self)
+        member = ctx.children[2].accept(self)
+
+
+        print("obj: ", obj)
+        print("member: ", member)
+        if member == prototype:
+            #obj.create(None, 
+            pass
+        return getattr(obj, member)
 
 
     # Visit a parse tree produced by ECMAScriptParser#withStatement.
@@ -357,8 +379,8 @@ class InterpreterVisitor(ECMAScriptVisitor):
     # Visit a parse tree produced by ECMAScriptParser#AssignmentOperatorExpression.
     def visitAssignmentOperatorExpression(self, ctx):
         # a = 1 for example, where = and 1 are lists
-        dprint("visitAssignmentOperatorExpression")
-        # printCtx(ctx, 1)
+        print("visitAssignmentOperatorExpression")
+        printCtx(ctx, 2)
         if ctx.getChildCount() == 3: # a = 3
             type = ctx.children[1].accept(self)
             name = ctx.children[0].accept(self)
@@ -812,7 +834,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
             # dont retun the value since JavaScript does not return in this case
             #print("What we assign in visitVariableDec is: ", ctx.children[0].symbol.text, ctx.children[1].accept(self))
             self.environment.defineVariable(ctx.children[0].symbol.text, ctx.children[1].accept(self))
-            name = ctx.children[0].symbol.text
+            #name = ctx.children[0].symbol.text
             #print("what is ", name ," then? ", self.environment.value(name))
 
 
