@@ -70,7 +70,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
             name = name[1:-1]
         #else:
             #print("is type: ", type(name))
-        tmp = {"name": name, "value": ctx.children[2].accept(self)}
+        tmp = {"name": name, "value": ctx.children[2].accept(self), "function": False, "setter": False}
         return tmp
 
 
@@ -228,7 +228,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
             return retVal
 
         retFunc =  Function(None, self.environment, runBodyFunction)
-        tmp = {"name": name, "value": retFunc}
+        tmp = {"name": name, "value": retFunc, "function" : True, "setter": False}
         #self.environment.defineVariable(name, retFunc)
         return tmp
 
@@ -302,7 +302,7 @@ class InterpreterVisitor(ECMAScriptVisitor):
             return retVal
 
         retFunc =  Function(params, self.environment, runBodyFunction)
-        tmp = {"name": name, "value": retFunc}
+        tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
         #self.environment.defineVariable(name, retFunc)
         print("name: ", name)
         print("params: ", params)
@@ -373,6 +373,13 @@ class InterpreterVisitor(ECMAScriptVisitor):
                 newObj = ObjectModule();
                 setattr(obj, "prototype", newObj)
                 return newObj
+        getSetObj = getattr(obj, member)
+        if isinstance(getSetObj, ObjectModule):
+            if hasattr(getSetObj, "get"):
+                hest = [a, b, c, d]
+                vi var här o hade oss
+                return getSetObj.get(self,a, b, c, d)
+
         return getattr(obj, member)
 
 
@@ -830,13 +837,23 @@ class InterpreterVisitor(ECMAScriptVisitor):
         for c in ctx.children:
             if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ", or { or }"
                 #settattr(this, c.accept(self)
-                pair = c.accept(self) # tmp = {"name": ctx.children[0].accept(self), "value": ctx.children[2].accept(self)}
-                print("pair is: ", pair)
-                #print("result: ", pair["name"], " value: ",  pair["value"])
-                if isinstance(pair["name"], str):
-                    setattr(this, pair["name"], pair["value"])
+                pair = c.accept(self) # tmp = {"name": ctx.children[0].accept(self), "value": ctx.children[2].accept(self), "function" : False}
+
+                #print("pair is: ", pair)
+                if pair["function"]:
+                    print("function is: ", pair)
+                    newObj = ObjectModule()
+                    name = "get"
+                    if pair["setter"]:
+                        name = "set"
+                    setattr(newObj, name, pair["value"])
+                    setattr(this, pair["name"], newObj)
                 else:
-                    setattr(this, "int_"+str(int(pair["name"])), pair["value"])
+                    #print("result: ", pair["name"], " value: ",  pair["value"])
+                    if isinstance(pair["name"], str):
+                        setattr(this, pair["name"], pair["value"])
+                    else:
+                        setattr(this, "int_"+str(int(pair["name"])), pair["value"])
 
 
 
