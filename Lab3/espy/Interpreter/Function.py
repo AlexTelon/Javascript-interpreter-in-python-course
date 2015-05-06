@@ -21,6 +21,7 @@ class Function:
     This creates a new function with a set of args (which is an array of string with the name of the variables used as arguments), the global environment
     used when defining the function and a lambda function defining the body to be called (should take one single argument, which is the environment)
     '''
+
     self.args = args
     self.parentEnv = environment
     self.body = body
@@ -68,8 +69,8 @@ class Function:
     self.environment = Environment(self.parentEnv)
     self.environment.defineVariable("this", this)
     i = 0
-    for arg in self.args:
-      self.environment.defineVariable(arg, args[i])
-      i = i + 1
-    
+    if not args == ():
+      for arg in self.args:
+        self.environment.defineVariable(arg, args[i])
+        i = i + 1
     return self.body(self.environment)

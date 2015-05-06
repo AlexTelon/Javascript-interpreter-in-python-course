@@ -12,7 +12,7 @@ from Interpreter.Object import Object, ObjectModule
 from Interpreter.Property import Property
 
 def printCtx(ctx, level=14, tab="", path="ctx"):
-    if (True):
+    if False:
         #print(tab, "Entering ctx")
         print(tab,"list of ", ctx.getChildCount(), "")
         num = -1;
@@ -44,7 +44,7 @@ def sPrintCtx(ctx):
     print("")
 
 def dprint(string):
-    if (True):
+    if False:
         print(string)
     
 class InterpreterVisitor(ECMAScriptVisitor):
@@ -103,15 +103,21 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#ArgumentsExpression.
     def visitArgumentsExpression(self, ctx):
-        print("visitArgumentsExpression")
+        dprint("visitArgumentsExpression")
         printCtx(ctx)
         func = ctx.children[0].accept(self)
-        print("func: ", func)
+        #print("func argumentsExpression: ", func)
         args = ctx.children[1].accept(self)
-        print("args: ", args)
+        #print("args argumentsExpression: ", args)
         this = ctx.children[0].children[0].accept(self)
-        print("this: ", this)
-        if(args == None): args = []
+        #print("this argumentsExpression: ", this)
+
+        if args is None:
+            args = []
+        
+        if hasattr(func, "__name__") and func.__name__ == "append":
+            this.append(*args)
+            return args[0]
         #print("alex5: ", *args)
         #print("things over here:", self.environment.valueDict)
         return func(this, *args)
@@ -216,8 +222,8 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#PropertyGetter.
     def visitPropertyGetter(self, ctx):
-        print("visitPropertyGetter")
-        printCtx(ctx, 2)
+        dprint("visitPropertyGetter")
+        #printCtx(ctx, 2)
         name = ctx.children[1].accept(self)
         body = ctx.children[5]
         def runBodyFunction(env):
@@ -289,11 +295,13 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#PropertySetter.
     def visitPropertySetter(self, ctx):
-        print("visitPropertySetter")
+        dprint("visitPropertySetter")
         printCtx(ctx, 2)
         name = ctx.children[1].accept(self)
         params = ctx.children[3].accept(self)
         body = ctx.children[6]
+
+
         def runBodyFunction(env):
             origEnv = self.environment
             self.environment = env
@@ -301,12 +309,24 @@ class InterpreterVisitor(ECMAScriptVisitor):
             self.environment = origEnv
             return retVal
 
-        retFunc =  Function(params, self.environment, runBodyFunction)
-        tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
+        retFunc =  Function([params], self.environment, runBodyFunction)
+        #TA BORT DETTA tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
+
+        prop = Property()
+        param = ObjectModule()
+        param.set = retFunc;
+        param.defineProperty(None, whateverObjIs, name, param)
+        return whateverObjIs
+        # Do this thing in many places här var vi
+        # i PropertyGetter och vart vi hämtar ut värderna
+        # vi klarade tester fram tom  08/08
+        # testarna funka 08/08 innan vi ändrade i denna funktion.
+
         #self.environment.defineVariable(name, retFunc)
-        print("name: ", name)
-        print("params: ", params)
-        return tmp
+        #print("name: ", name)
+        #print("params: ", params)
+
+
 
     # Visit a parse tree produced by ECMAScriptParser#NewExpression.
     def visitNewExpression(self, ctx):
@@ -357,9 +377,15 @@ class InterpreterVisitor(ECMAScriptVisitor):
         obj    = ctx.children[0].accept(self)
         member = ctx.children[2].accept(self)
 
+        
 
-        print("obj: ", obj)
-        print("member: ", member)
+        #print("obj dotExpression: ", obj)
+        #print("member dotExpression: ", member)
+        if member == "length":
+            return float(len(obj))
+
+            derpa
+
         if member == "prototype":
             if not hasattr(obj, "prototype"):
                 # We want to save the prototype thing somehow
@@ -376,9 +402,12 @@ class InterpreterVisitor(ECMAScriptVisitor):
         getSetObj = getattr(obj, member)
         if isinstance(getSetObj, ObjectModule):
             if hasattr(getSetObj, "get"):
-                hest = [a, b, c, d]
-                vi var här o hade oss
-                return getSetObj.get(self,a, b, c, d)
+                #hest = [a, b, c, d]
+                getter = getattr(getSetObj, "get")
+                #print("hestor get: ", getter)
+                ret = getter(ctx.children[0].accept(self))
+                return ret
+                #return getSetObj.get(self)#,a, b, c, d)
 
         return getattr(obj, member)
 
@@ -438,8 +467,8 @@ class InterpreterVisitor(ECMAScriptVisitor):
     # Visit a parse tree produced by ECMAScriptParser#AssignmentOperatorExpression.
     def visitAssignmentOperatorExpression(self, ctx):
         # a = 1 for example, where = and 1 are lists
-        dprint("visitAssignmentOperatorExpression")
-        #printCtx(ctx, 2)
+        #print("visitAssignmentOperatorExpression")
+        printCtx(ctx, 2)
         if ctx.getChildCount() == 3: # a = 3
             type = ctx.children[1].accept(self)
             name = ctx.children[0].accept(self)
@@ -461,11 +490,11 @@ class InterpreterVisitor(ECMAScriptVisitor):
                         oldVal = getattr(name, "int_"+str(int(index)))
                 else:
                     oldVal = name[int(index)]
-        elif ctx.getChildCount() == 5: # a.type = 3
+        elif ctx.getChildCount() == 5: # a.b = 3
             type = ctx.children[3].accept(self) # =
             obj = ctx.children[0].accept(self) # a
             value = ctx.children[4].accept(self) # 3
-            index = ctx.children[2].accept(self) # type
+            index = ctx.children[2].accept(self) # b
 
             # if assignment then we dont need keep track of old values
             # also an old value might not exist
@@ -499,6 +528,22 @@ class InterpreterVisitor(ECMAScriptVisitor):
                 name[int(index)] = newVal
             return newVal
         elif ctx.getChildCount() == 5:
+            #print("dir of: ", obj, " is bla : ", dir(obj))
+
+            # this is done to get setter from object, cannot get it directly from ctx 
+            if hasattr(obj, index):
+                getSetObj = getattr(obj, index)
+
+                if hasattr(getSetObj, "set"):
+                    index = getSetObj
+                    #print("in setter thing")
+                    setter = getattr(index, "set")
+                    #print("setter is: ", setter)
+                    this = obj
+                    ret = setter(this, newVal)
+                    #print("ret: ", ret)
+                    return ret
+
             setattr(obj, index, newVal)
 
 
@@ -822,17 +867,10 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
     # Visit a parse tree produced by ECMAScriptParser#objectLiteral.
     def visitObjectLiteral(self, ctx):
-        print("visitObjectLiteral")
-        printCtx(ctx, 4)
+        dprint("visitObjectLiteral")
+        #printCtx(ctx, 4)
         this = ObjectModule()
         prop = Property(this)
-        # setattr(this, "type", "Fiat")
-        # setattr(this, "model", 500)
-        # setattr(this, "color", "white")
-        # setattr(this, "km",  120)
-        # setattr(this, "int_7", "septInt")
-        # setattr(this, "7", "sept")
-
 
         for c in ctx.children:
             if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ", or { or }"
@@ -841,13 +879,19 @@ class InterpreterVisitor(ECMAScriptVisitor):
 
                 #print("pair is: ", pair)
                 if pair["function"]:
-                    print("function is: ", pair)
+                    #print("function is: ", pair)
                     newObj = ObjectModule()
                     name = "get"
                     if pair["setter"]:
+                        #print("setter111!!!11")
                         name = "set"
+                    
+                    #print("saving ", name, ", with value ", pair["value"], ", to ", newObj)
                     setattr(newObj, name, pair["value"])
+                    #print("dir: ", dir(newObj))
+                    #print("Now saving ", pair['name'], ", with value ", newObj, ", to ", this)
                     setattr(this, pair["name"], newObj)
+                    #print("dir: ", dir(this))
                 else:
                     #print("result: ", pair["name"], " value: ",  pair["value"])
                     if isinstance(pair["name"], str):
