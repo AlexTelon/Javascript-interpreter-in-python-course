@@ -310,13 +310,14 @@ class InterpreterVisitor(ECMAScriptVisitor):
             return retVal
 
         retFunc =  Function([params], self.environment, runBodyFunction)
-        #TA BORT DETTA tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
+        tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
+        return tmp
 
-        prop = Property()
-        param = ObjectModule()
-        param.set = retFunc;
-        param.defineProperty(None, whateverObjIs, name, param)
-        return whateverObjIs
+        #prop = Property()
+        #param = ObjectModule()
+        #param.set = retFunc;
+        #param.defineProperty(None, whateverObjIs, name, param)
+        #return whateverObjIs
         # Do this thing in many places här var vi
         # i PropertyGetter och vart vi hämtar ut värderna
         # vi klarade tester fram tom  08/08
