@@ -313,11 +313,11 @@ class InterpreterVisitor(ECMAScriptVisitor):
         tmp = {"name": name, "value": retFunc, "function": True, "setter": True}
         return tmp
 
-        #prop = Property()
-        #param = ObjectModule()
-        #param.set = retFunc;
-        #param.defineProperty(None, whateverObjIs, name, param)
-        #return whateverObjIs
+        # prop = Property()
+        # param = ObjectModule()
+        # param.set = retFunc;
+        # param.defineProperty(None, whateverObjIs, name, param)
+        # return whateverObjIs
         # Do this thing in many places här var vi
         # i PropertyGetter och vart vi hämtar ut värderna
         # vi klarade tester fram tom  08/08
@@ -1027,9 +1027,6 @@ class InterpreterVisitor(ECMAScriptVisitor):
         #print("return value functionBody is: ", tmp)
         return tmp
         
-
-
-
     # Visit a parse tree produced by ECMAScriptParser#eof.
     def visitEof(self, ctx):
         raise Utils.UnimplementedVisitorException(ctx)
