@@ -1,0 +1,16 @@
+#!/bin/bash
+
+TEST_NAME=$2
+ESPY_DIR="`pwd`/$1"
+
+DIR=$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+if [ -z "$TEST_NAME" ]
+then
+  TEST_NAME="all"
+fi
+
+if [ $TEST_NAME = "all" -o $TEST_NAME = "executor" ]
+then
+  PYTHONPATH="$ESPY_DIR:$PYTHONPATH" $DIR/Tests/Executor.py
+fi
