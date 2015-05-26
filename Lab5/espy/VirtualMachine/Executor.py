@@ -2,7 +2,6 @@ from Interpreter.Environment    import Environment
 from Interpreter.Object         import Object
 from Interpreter.Function       import Function
 from Interpreter.Property       import Property
-
 from VirtualMachine.OpCode      import OpCode
 from VirtualMachine.Code        import Code
 from VirtualMachine.Instruction import Instruction
@@ -10,7 +9,7 @@ from VirtualMachine.Stack       import Stack
 
 from Interpreter.ControlExceptions import ReturnException
 from Interpreter.ESException       import ESException
-
+from Utils.UnsignedShiftRight      import unsignedShiftRight
 
 
 class Executor:
@@ -21,6 +20,7 @@ class Executor:
     self.environment = environment
     self.stack  = Stack()
     self.current_index = 0;
+    self.exceptionAddress = None;
     
     # The following code acts as a switch statements for OpCodes
     self.opmaps  = {}
@@ -44,37 +44,58 @@ class Executor:
     self.opmaps[OpCode.IFJMP] = Executor.execute_ifjmp
     self.opmaps[OpCode.UNLESSJMP] = Executor.execute_unlessjmp
     self.opmaps[OpCode.CALL] = Executor.execute_call
-    # self.opmaps[OpCode.NEW] = Executor.execute_new
-    # self.opmaps[OpCode.RET] = Executor.execute_ret
-    # self.opmaps[OpCode.SWITCH] = Executor.execute_switch
+    self.opmaps[OpCode.NEW] = Executor.execute_new
+    self.opmaps[OpCode.RET] = Executor.execute_ret
+    self.opmaps[OpCode.SWITCH] = Executor.execute_switch
 
     # Exceptions
+    self.opmaps[OpCode.TRY_PUSH] = Executor.execute_try_push
+    self.opmaps[OpCode.TRY_POP] = Executor.execute_try_pop
+    self.opmaps[OpCode.THROW] = Executor.execute_throw
+
     # Array and Objects creation
+    self.opmaps[OpCode.MAKE_ARRAY] = Executor.execute_make_array
+    self.opmaps[OpCode.MAKE_OBJECT] = Executor.execute_make_object
+    self.opmaps[OpCode.MAKE_FUNC] = Executor.execute_make_func
+    self.opmaps[OpCode.MAKE_GETTER] = Executor.execute_make_getter
+    self.opmaps[OpCode.MAKE_SETTER] = Executor.execute_make_setter
+
     # Binary arithmetic operation
+    self.opmaps[OpCode.ADD] = Executor.execute_add
+    self.opmaps[OpCode.MUL] = Executor.execute_mul
+    self.opmaps[OpCode.SUB] = Executor.execute_sub
+    self.opmaps[OpCode.DIV] = Executor.execute_div
+    self.opmaps[OpCode.MOD] = Executor.execute_mod
+    self.opmaps[OpCode.LEFT_SHIFT] = Executor.execute_left_shift
+    self.opmaps[OpCode.RIGHT_SHIFT] = Executor.execute_right_shift
+    self.opmaps[OpCode.UNSIGNED_RIGHT_SHIFT] = Executor.execute_unsigned_right_shift
+
     # Binary bolean operation
+    self.opmaps[OpCode.SUPPERIOR] = Executor.execute_supperior
+    self.opmaps[OpCode.SUPPERIOR_EQUAL] = Executor.execute_supperior_equal
+    self.opmaps[OpCode.INFERIOR] = Executor.execute_inferior
+    self.opmaps[OpCode.INFERIOR_EQUAL] = Executor.execute_inferior_equal
+    self.opmaps[OpCode.EQUAL] = Executor.execute_equal
+    self.opmaps[OpCode.DIFFERENT] = Executor.execute_different
+    self.opmaps[OpCode.AND] = Executor.execute_and
+    self.opmaps[OpCode.OR] = Executor.execute_or
+
     # Unary operations
-   
+    self.opmaps[OpCode.NEG] = Executor.execute_neg
+    self.opmaps[OpCode.TILDE] = Executor.execute_tilde
+    self.opmaps[OpCode.NOT] = Executor.execute_not
     
   
   def execute(self, program):
     '''
     Execute the program given in argument
     '''
-    
-    # You might have to modify this later.
-    # for inst in program.instructions:
-    #   inst = program.instructions[self.current_index]
-    #   f = self.opmaps[inst.opcode]
-
-    #   f(self, *inst.params)
-    #   self.current_index = self.current_index + 1
-    #for inst in program.instructions:
     while self.current_index < len(program.instructions):
       inst = program.instructions[self.current_index]
       f = self.opmaps[inst.opcode]
-
       f(self, *inst.params)
-      self.current_index = self.current_index + 1
+      self.current_index = self.current_index + 1        
+        
 
   def execute_push(self, value):
     '''
@@ -211,5 +232,317 @@ class Executor:
     params = []
     for i in range(0,args):
       params.append(self.stack.pop())
-    print("params: ", params)
-    func(self, *params)    
+
+    try:
+      ret = func(self, *params)
+    except ReturnException as e:
+      ret = e.value
+
+    self.stack.push(ret)
+
+  def execute_new(self, args):
+    '''
+    Execute the NEW instruction
+    '''
+    func = self.stack.pop()
+    params = []
+    for i in range(0,args):
+      params.insert(0, self.stack.pop())
+    
+    ret = func(self, *params)
+    self.stack.push(Object())
+
+  def execute_ret(self):
+    '''
+    Execute the RET instruction
+    '''
+    ret = self.stack.pop()
+    raise ReturnException(ret)
+
+  def execute_switch(self, default):
+    '''
+    Execute the SWITCH instruction
+    '''
+    values = self.stack.pop()
+    key = self.stack.pop()
+
+    try:
+      self.current_index = values[key] -1 
+    except:
+      self.current_index = default - 1 
+
+  def execute_try_push(self, idx):
+    '''
+    Execute the TRY_PUSH instruction
+    '''
+    self.exceptionAddress = idx
+
+  def execute_throw(self):
+    '''
+    Execute the THROW instruction
+    '''
+    if self.exceptionAddress is None:
+      topStack = self.stack.pop()
+      raise ESException(topStack)
+    self.current_index = self.exceptionAddress - 1
+
+  def execute_try_pop(self):
+    '''
+    Execute the TRY_POP instruction
+    '''
+    self.exceptionAddress = None
+
+  def execute_make_array(self, count):
+    '''
+    Execute the MAKE_ARRAY instruction
+    '''
+    array = []
+    for i in range(0,count):
+      array.insert(0, self.stack.pop())
+    self.stack.push(array)
+
+  def execute_make_object(self, count):
+    '''
+    Execute the MAKE_OBJECT instruction
+    '''
+    Obj = Object()
+    key = ""
+    count = count * 2
+    for i in range(0,count):
+      if i % 2 == 0:
+        # we have an value
+        key = self.stack.pop()
+      else:
+        # we have an key
+        value = self.stack.pop()
+        setattr(Obj, key, value)
+    self.stack.push(Obj)
+
+  def execute_make_func(self):
+    '''
+    Execute the MAKE_FUNC instruction
+    '''
+    code = self.stack.pop()
+    args = self.stack.pop()
+    def body(env):
+      exe = Executor(Environment(env))
+      exe.execute(code)
+             
+    f = Function(args, self.environment, body)
+    self.stack.push(f)
+
+  def execute_make_getter(self):
+    '''
+    Execute the MAKE_GETTER instruction
+    '''
+    name = self.stack.pop()
+    func = self.stack.pop()
+    obj = self.stack.pop()
+    
+    if(hasattr(obj,name) and isinstance(getattr(obj,name), Property )):
+       prop = getattr(obj,name)
+    else:
+       prop = Property(obj)
+    prop.getter = func
+    setattr(obj, name, prop)
+       
+    self.stack.push(obj)
+
+  def execute_make_setter(self):
+    '''
+    Execute the MAKE_SETTER instruction
+    '''
+    name = self.stack.pop()
+    func = self.stack.pop()
+    obj = self.stack.pop()
+    
+    if(hasattr(obj,name) and isinstance(getattr(obj,name), Property)):
+       prop = getattr(obj,name)
+    else:
+       prop = Property(obj)
+    prop.setter = func
+    setattr(obj, name, prop)
+       
+    self.stack.push(obj)
+
+  def execute_add(self):
+    '''
+    Execute the ADD instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = a+b
+    self.stack.push(val)
+
+  def execute_mul(self):
+    '''
+    Execute the MUL instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = a*b
+    self.stack.push(val)
+
+  def execute_sub(self):
+    '''
+    Execute the SUB instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b-a
+    self.stack.push(val)
+
+  def execute_div(self):
+    '''
+    Execute the DIV instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b/a
+    self.stack.push(val)
+
+  def execute_mod(self):
+    '''
+    Execute the MOD instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b % a
+    self.stack.push(val)
+
+  def execute_left_shift(self):
+    '''
+    Execute the LEFT_SHIFT instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    a = int(a)
+    b = int(b)
+    val = b << a
+    val = float(val)
+    self.stack.push(val)
+
+  def execute_right_shift(self):
+    '''
+    Execute the RIGHT_SHIFT instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    a = int(a)
+    b = int(b)
+    val = b >> a
+    val = float(val)
+    self.stack.push(val)
+
+  def execute_unsigned_right_shift(self):
+    '''
+    Execute the UNSIGNED_RIGHT_SHIFT instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    a = int(a)
+    b = int(b)
+    val = unsignedShiftRight(b,a)
+    val = float(val)
+    self.stack.push(val)
+
+  def execute_supperior(self):
+    '''
+    Execute the SUPPERIOR instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b > a
+    self.stack.push(val)
+
+  def execute_supperior_equal(self):
+    '''
+    Execute the SUPPERIOR_EQUAL instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b >= a
+    self.stack.push(val)
+
+  def execute_inferior(self):
+    '''
+    Execute the INFERIOR instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b < a
+    self.stack.push(val)
+
+  def execute_inferior_equal(self):
+    '''
+    Execute the INFERIOR_EQUAL instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b <= a
+    self.stack.push(val)
+
+  def execute_equal(self):
+    '''
+    Execute the EQUAL instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b == a
+    self.stack.push(val)
+
+  def execute_different(self):
+    '''
+    Execute the DIFFERENT instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = not (b == a)
+    self.stack.push(val)
+
+  def execute_and(self):
+    '''
+    Execute the AND instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b and a
+    self.stack.push(val)
+
+  def execute_or(self):
+    '''
+    Execute the OR instruction
+    '''
+    a = self.stack.pop()
+    b = self.stack.pop()
+    val = b or a
+    self.stack.push(val)
+
+
+  def execute_neg(self):
+    '''
+    Execute the NEG instruction
+    '''
+    a = self.stack.pop()
+    val = -a
+    self.stack.push(val)
+
+
+  def execute_tilde(self):
+    '''
+    Execute the TILDE instruction
+    '''
+    a = self.stack.pop()
+    a = int(a)
+    val = ~a
+    float(val)
+    self.stack.push(val)
+
+
+  def execute_not(self):
+    '''
+    Execute the NOT instruction
+    '''
+    a = self.stack.pop()
+    val = not a
+    self.stack.push(val)
