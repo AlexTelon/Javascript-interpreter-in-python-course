@@ -1,0 +1,5 @@
+1.0
+True
+False
+Hello World!
+16.0

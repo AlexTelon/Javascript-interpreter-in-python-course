@@ -1,0 +1,5 @@
+console.log(1.0)
+console.log(true)
+console.log(false)
+console.log("Hello World!")
+console.log(0x10)

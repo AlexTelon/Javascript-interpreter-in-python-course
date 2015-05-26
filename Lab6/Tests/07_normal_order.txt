@@ -1,0 +1,10 @@
+func_false has been called
+For false and true, only func_false has been called
+func_true has been called
+func_false has been called
+For true and false, only func_false has been called
+func_true has been called
+For true or false, only func_true has been called
+func_false has been called
+func_true has been called
+For false or true, func_false and func_true has been called
