@@ -1,11 +1,14 @@
 from Interpreter.Environment    import Environment
-from Interpreter.Object         import Object
+from Interpreter.Object         import Object, ObjectModule
 from Interpreter.Function       import Function
 from Interpreter.Property       import Property
 from VirtualMachine.OpCode      import OpCode
 from VirtualMachine.Code        import Code
 from VirtualMachine.Instruction import Instruction
 from VirtualMachine.Stack       import Stack
+
+from Interpreter.Console import Console
+from Interpreter.Math import MathModule
 
 from Interpreter.ControlExceptions import ReturnException
 from Interpreter.ESException       import ESException
@@ -18,6 +21,11 @@ class Executor:
   '''
   def __init__(self, environment = Environment()):
     self.environment = environment
+
+    self.environment.defineVariable("console", Console())
+    self.environment.defineVariable("Math", MathModule())
+    self.environment.defineVariable("Object", ObjectModule())
+
     self.stack  = Stack()
     self.current_index = 0;
     self.exceptionAddress = None;

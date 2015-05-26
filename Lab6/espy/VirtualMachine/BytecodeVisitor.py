@@ -1,8 +1,21 @@
-# Generated from java-escape by ANTLR 4.4
+#Generated from java-escape by ANTLR 4.4
 import antlr4
 import Utils
 
+from VirtualMachine.OpCode      import OpCode
+from VirtualMachine.Code        import Code
+from VirtualMachine.Instruction import Instruction
+from VirtualMachine.Stack       import Stack
+
 from ECMAScriptParser import ECMAScriptVisitor
+
+from Interpreter.Console import Console
+from Interpreter.Math import MathModule
+from Interpreter.Environment import Environment
+from Interpreter.Function import Function
+from Interpreter.Object import Object, ObjectModule
+from Interpreter.Property import Property
+
 
 def printCtx(ctx, level=14, tab="", path="ctx"):
     if True:
@@ -39,6 +52,9 @@ def dprint(string):
     if True:
         print(string)
 
+# def console(value):
+#     print(value)
+
 # This class defines a complete generic visitor for a parse tree produced by ECMAScriptParser.
 class BytecodeVisitor(ECMAScriptVisitor):
   def __init__(self, program):
@@ -54,29 +70,27 @@ class BytecodeVisitor(ECMAScriptVisitor):
   AV_INDICE     = 2
   
   
+  def visitTerminal(self, node):
+      return node.symbol.text
+
   
   # Visit a parse tree produced by ECMAScriptParser#ArgumentsExpression.
   def visitArgumentsExpression(self, ctx):
     print("visitArugmentsExpression")
     printCtx(ctx)
-
-    #vi copy-pastade precis in dethär nedan...
-    func = ctx.children[0].accept(self)
-    print("func argumentsExpression: ", func)
+    #ordering is important!
+    #many accepts do stuff on the stack for you!
     args = ctx.children[1].accept(self)
     print("args argumentsExpression: ", args)
-    this = ctx.children[0].children[0].accept(self)
-    print("this argumentsExpression: ", this)
+
+    func = ctx.children[0].accept(self)
+    print("func argumentsExpression: ", func)
 
     if args is None:
       args = []
         
-    if hasattr(func, "__name__") and func.__name__ == "append":
-      this.append(*args)
-      return args[0]
-    return func(this, *args)
-
-  
+    self.add_instruction(OpCode.CALL, args)
+     
   
   # Visit a parse tree produced by ECMAScriptParser#elementList.
   def visitElementList(self, ctx):
@@ -90,13 +104,23 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#emptyStatement.
   def visitEmptyStatement(self, ctx):
       raise Utils.UnimplementedVisitorException(ctx)
-# Visit a parse tree produced by ECMAScriptParser#NewExpression.
+
+  # Visit a parse tree produced by ECMAScriptParser#NewExpression.
   def visitNewExpression(self, ctx):
       raise Utils.UnimplementedVisitorException(ctx)
 
   # Visit a parse tree produced by ECMAScriptParser#MemberDotExpression.
   def visitMemberDotExpression(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitMemberDotExpression")
+      printCtx(ctx)
+      obj    = ctx.children[0].accept(self)
+      print("obj: ", obj)
+
+      member = ctx.children[2].accept(self)
+      print("member: ", member)
+      
+      # on top of stack we have obj
+      self.add_instruction(OpCode.LOAD_MEMBER, member)
       
     # Visit a parse tree produced by ECMAScriptParser#tryStatement.
   def visitTryStatement(self, ctx):
@@ -179,6 +203,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   
   
   def gen_setter(self, a, idx, b):
+    dprint("gen_setter, 3 args")
+
     if(isinstance(a, list)):
       a[int(idx)] = b
     else:
@@ -196,6 +222,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
         setattr(a, idx, b)
 
   def gen_getter(self, a, idx):
+    dprint("gen_getter, 2 args")
     if(isinstance(a, list)):
       if(idx == 'length'):
         return float(len(a))
@@ -212,24 +239,29 @@ class BytecodeVisitor(ECMAScriptVisitor):
         return val
 
   def gen_setter_dot(self, a, idx):
+    dprint("gen_stter_dot")
     a.accept(self)
     self.add_instruction(OpCode.STORE_MEMBER, idx)
     
   def gen_getter_dot(self, a, idx):
+    dprint("gen_getter_dot")
     a.accept(self)
     self.add_instruction(OpCode.LOAD_MEMBER, idx)
     
   def gen_setter_indice(self, a, idx):
+    dprint("gen_setter_indice")
     a.accept(self)
     idx.accept(self)
     self.add_instruction(OpCode.STORE_INDEX)
     
   def gen_getter_indice(self, a, idx):
+    dprint("gen_getter_indice")
     a.accept(self)
     idx.accept(self)
     self.add_instruction(OpCode.LOAD_INDEX)
     
   def assignmentVariable(self, array, index, typ):
+    dprint("assignmentVariable")
     if(typ == self.AV_IDENTIFIER):
       variable_setter = lambda: self.add_instruction(OpCode.STORE, array[index].symbol.text)
       variable_getter = lambda: self.add_instruction(OpCode.LOAD, array[index].symbol.text)
@@ -245,6 +277,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#PropertyExpressionAssignment.
   def visitPropertyExpressionAssignment(self, ctx):
+    dprint("visitPropertyExpressionAssignment")
     ctx.children[2].accept(self)
     name = ctx.children[0].accept(self)
     if(name != None):
@@ -253,16 +286,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#assignmentOperator.
   def visitAssignmentOperator(self, ctx):
+    dprint("visitAssignmentOperator")
     return ctx.children[0].symbol.text
 
 
   # Visit a parse tree produced by ECMAScriptParser#eos.
   def visitEos(self, ctx):
+    dprint("visitEos")
     pass
 
 
   # Visit a parse tree produced by ECMAScriptParser#program.
   def visitProgram(self, ctx):
+    dprint("visitProgram")
     args = []
     for c in ctx.children:
       if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
@@ -272,6 +308,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#argumentList.
   def visitArgumentList(self, ctx):
+    dprint("visitArgumentList")
     count = 0
     for c in ctx.children:
       if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
@@ -285,16 +322,21 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#ThisExpression.
   def visitThisExpression(self, ctx):
+    dprint("visitThisExpression")
     self.add_instruction(OpCode.LOAD, "this")
 
 
-  # Visit a parse tree produced by ECMAScriptParser#identifierName.
+  # Visit a parse tree produced by ECMAScriptParser#identifierName.  
   def visitIdentifierName(self, ctx):
+    dprint("visitIdentifierName")
+    #printCtx(ctx)
     return ctx.children[0].accept(self)
+    
 
 
   # Visit a parse tree produced by ECMAScriptParser#BinaryExpression.
   def visitBinaryExpression(self, ctx):
+    dprint("visitBinaryExpression")
     op  = ctx.children[1].accept(self)
     
     ctx.children[0].accept(self)
@@ -342,16 +384,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#initialiser.
   def visitInitialiser(self, ctx):
+    dprint("visitInitialiser")
     ctx.children[1].accept(self)
 
 
   # Visit a parse tree produced by ECMAScriptParser#statementList.
   def visitStatementList(self, ctx):
+    dprint("visitStatementList")
     self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#PropertyGetter.
   def visitPropertyGetter(self, ctx):
+    dprint("visitPropertyGetter")
     func_code     = VirtualMachine.Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[5].accept(bv)
@@ -364,11 +409,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#block.
   def visitBlock(self, ctx):
+    dprint("visitBlock")
     self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#expressionStatement.
   def visitExpressionStatement(self, ctx):
+    dprint("visitExpressionStatement")
     self.visitChildren(ctx)
     self.add_instruction(OpCode.POP, 1)
 
@@ -377,15 +424,11 @@ class BytecodeVisitor(ECMAScriptVisitor):
   def visitKeyword(self, ctx):
       raise Utils.UnimplementedVisitorException(ctx)
 
-
   
-
-
   # Visit a parse tree produced by ECMAScriptParser#numericLiteral.
   def visitNumericLiteral(self, ctx):
+    dprint("visitNumericLiteral")
     self.add_instruction(OpCode.PUSH, float(eval(ctx.children[0].symbol.text)))
-
-
   
 
   # Visit a parse tree produced by ECMAScriptParser#labelledStatement.
@@ -395,6 +438,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#PropertySetter.
   def visitPropertySetter(self, ctx):
+    dprint("visitPropertySetter")
     func_code     = VirtualMachine.Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[6].accept(bv)
@@ -405,18 +449,16 @@ class BytecodeVisitor(ECMAScriptVisitor):
     self.add_instruction(OpCode.MAKE_SETTER)
 
 
-  
-
   # Visit a parse tree produced by ECMAScriptParser#LiteralExpression.
   def visitLiteralExpression(self, ctx):
+    dprint("visitLiteralExpression")
     self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#ArrayLiteralExpression.
   def visitArrayLiteralExpression(self, ctx):
+    dprint("visitArrayLiteralExpression")
     return ctx.children[0].accept(self)
-
-  
 
 
   # Visit a parse tree produced by ECMAScriptParser#withStatement.
@@ -431,6 +473,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#formalParameterList.
   def visitFormalParameterList(self, ctx):
+    dprint("visitFormalParameterList")
     args = []
     for c in ctx.children:
       if(c.symbol.type == ECMAScriptParser.Lexer.Identifier):
@@ -440,11 +483,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#incrementOperator.
   def visitIncrementOperator(self, ctx):
+    dprint("visitIncrementOperator")
     return ctx.children[0].symbol.text
 
 
   # Visit a parse tree produced by ECMAScriptParser#AssignmentOperatorExpression.
   def visitAssignmentOperatorExpression(self, ctx):
+    dprint("visitAssignmentOperatorExpression")
     if(len(ctx.children) == 3):
       (variable_setter, variable_getter) = self.assignmentVariable(ctx.children, 0, self.AV_IDENTIFIER)
       operator = ctx.children[1]
@@ -488,6 +533,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#PostUnaryAssignmentExpression.
   def visitPostUnaryAssignmentExpression(self, ctx):
+    dprint("visitPostUnaryAssignmentExpression")
     if(len(ctx.children) == 2):
       (variable_setter, variable_getter) = self.assignmentVariable(ctx.children, 0, self.AV_IDENTIFIER)
       operator = ctx.children[1]
@@ -525,11 +571,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#ObjectLiteralExpression.
   def visitObjectLiteralExpression(self, ctx):
+    dprint("visitObjectLiteralExpression")
     ctx.children[0].accept(self)
 
 
   # Visit a parse tree produced by ECMAScriptParser#arrayLiteral.
   def visitArrayLiteral(self, ctx):
+    dprint("visitArrayLiteral")
     ctx.children[1].accept(self)
 
 
@@ -540,11 +588,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#statements.
   def visitStatements(self, ctx):
+    dprint("visitStatements")
     self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#UnaryExpression.
   def visitUnaryExpression(self, ctx):
+    dprint("visitUnaryExpression")
     op  = ctx.children[0].symbol.text
     ctx.children[1].accept(self)
     
@@ -563,11 +613,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#expressionSequence.
   def visitExpressionSequence(self, ctx):
+    dprint("visitExpressionSequence")
     return self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#literal.
   def visitLiteral(self, ctx):
+    dprint("visitLiteral")
     child = ctx.children[0]
     if(isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)):
       if(child.symbol.text == 'true'):
@@ -582,19 +634,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#variableStatement.
   def visitVariableStatement(self, ctx):
+    dprint("visitVariableStatement")
     self.visitChildren(ctx)
-
-
 
 
   # Visit a parse tree produced by ECMAScriptParser#statement.
   def visitStatement(self, ctx):
+    dprint("visitStatement")
     self.visitChildren(ctx)
-
 
 
   # Visit a parse tree produced by ECMAScriptParser#ParenthesizedExpression.
   def visitParenthesizedExpression(self, ctx):
+    dprint("visitParenthesizedExpression")
     ctx.children[1].accept(self)
 
   
@@ -606,16 +658,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#finallyProduction.
   def visitFinallyProduction(self, ctx):
+    dprint("visitFinallyProduction")
     ctx.children[1].accept(self)
 
 
   # Visit a parse tree produced by ECMAScriptParser#IdentifierExpression.
   def visitIdentifierExpression(self, ctx):
+    dprint("visitIdentifierExpression")
     self.add_instruction(OpCode.LOAD, ctx.children[0].accept(self))
 
 
   # Visit a parse tree produced by ECMAScriptParser#propertyName.
   def visitPropertyName(self, ctx):
+    dprint("visitPropertyName")
     child = ctx.children[0]
     
     if(isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)):
@@ -631,6 +686,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#arguments.
   def visitArguments(self, ctx):
+    dprint("visitArguments")
     if(len(ctx.children) == 3):
       return ctx.children[1].accept(self)
     elif(len(ctx.children) == 2):
@@ -641,11 +697,13 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#variableDeclarationList.
   def visitVariableDeclarationList(self, ctx):
+    dprint("visitVariableDeclarationList")
     self.visitChildren(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#functionBody.
   def visitFunctionBody(self, ctx):
+    dprint("visitFunctionBody")
     ctx.children[0].accept(self)
 
 
@@ -656,6 +714,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#UnaryAssignmentExpression.
   def visitUnaryAssignmentExpression(self, ctx):
+    dprint("visitUnaryAssignmentExpression")
     operator = ctx.children[0]
     if(len(ctx.children) == 2):
       (variable_setter, variable_getter) = self.assignmentVariable(ctx.children, 1, self.AV_IDENTIFIER)
