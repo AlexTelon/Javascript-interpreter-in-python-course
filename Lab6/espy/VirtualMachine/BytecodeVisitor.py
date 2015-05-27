@@ -18,7 +18,7 @@ from Interpreter.Property import Property
 
 
 def printCtx(ctx, level=14, tab="", path="ctx"):
-    if True:
+    if 1==1:
         print(tab,"list of ", ctx.getChildCount(), "")
         num = -1;
         if (ctx.children != None):
@@ -48,9 +48,12 @@ def sPrintCtx(ctx):
                     print(path_, " is ", c)
     print("")
 
-def dprint(string):
-    if True:
-        print(string)
+def dprint(*string):
+    if 1==1:
+        for s in string:
+            print(s, end="")
+            print(" ", end="")
+        print("")
 
 # def console(value):
 #     print(value)
@@ -59,9 +62,11 @@ def dprint(string):
 class BytecodeVisitor(ECMAScriptVisitor):
   def __init__(self, program):
     self.program    = program
-
+    self.lineno = 0
   def add_instruction(self, opcode, *arguments):
     inst = Instruction(opcode, *arguments)
+    dprint("add_instruction:", self.lineno, ":", opcode, arguments)
+    self.lineno = self.lineno + 1
     self.program.add_instruction(inst)
     return inst
 
@@ -71,20 +76,22 @@ class BytecodeVisitor(ECMAScriptVisitor):
   
   
   def visitTerminal(self, node):
+      txt = "visitTerminal " + node.symbol.text
+      dprint(txt)
       return node.symbol.text
 
   
   # Visit a parse tree produced by ECMAScriptParser#ArgumentsExpression.
   def visitArgumentsExpression(self, ctx):
-    print("visitArugmentsExpression")
-    printCtx(ctx)
+    dprint("visitArugmentsExpression")
+    #printCtx(ctx)
     #ordering is important!
     #many accepts do stuff on the stack for you!
     args = ctx.children[1].accept(self)
-    print("args argumentsExpression: ", args)
+    #print("args argumentsExpression: ", args)
 
     func = ctx.children[0].accept(self)
-    print("func argumentsExpression: ", func)
+    #print("func argumentsExpression: ", func)
 
     if args is None:
       args = []
@@ -103,7 +110,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#emptyStatement.
   def visitEmptyStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitEmptyStatement")
+      pass
 
   # Visit a parse tree produced by ECMAScriptParser#NewExpression.
   def visitNewExpression(self, ctx):
@@ -112,12 +120,12 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#MemberDotExpression.
   def visitMemberDotExpression(self, ctx):
       dprint("visitMemberDotExpression")
-      printCtx(ctx)
+      #printCtx(ctx)
       obj    = ctx.children[0].accept(self)
-      print("obj: ", obj)
+      #print("obj: ", obj)
 
       member = ctx.children[2].accept(self)
-      print("member: ", member)
+      #print("member: ", member)
       
       # on top of stack we have obj
       self.add_instruction(OpCode.LOAD_MEMBER, member)
@@ -128,6 +136,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#DoStatement.
   def visitDoStatement(self, ctx):
+      dprint("visitDoStatement")
+      printCtx(ctx)
       raise Utils.UnimplementedVisitorException(ctx)
 
   # Visit a parse tree produced by ECMAScriptParser#WhileStatement.
@@ -178,12 +188,42 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#ifStatement.
   def visitIfStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitIfStatement")
+      
+      ctx.children[2].accept(self) # True/False value pused to stack 
+      placeHolderIFPosition = self.program.current_index()
+      self.add_instruction(OpCode.UNLESSJMP, 1337)
+      ctx.children[4].accept(self)
+
+      #if we have an else statement we need to jump over it
+      if ctx.getChildCount() >= 7:
+           placeHolderELSEPosition = self.program.current_index()
+           self.add_instruction(OpCode.JMP, 1337)
+
+      #make sure the IFJUMP jumps over the if-true part of the statements
+      afterIF = self.program.current_index()
+      self.program.instructions[placeHolderIFPosition] = Instruction(OpCode.UNLESSJMP, afterIF)
+
+      if (ctx.getChildCount() >= 7):
+          ctx.children[6].accept(self)
+          #change the jump in the if-statement to jump over the else part
+          afterELSE = self.program.current_index()
+          self.program.instructions[placeHolderELSEPosition] = Instruction(OpCode.JMP, afterELSE)
+
 
   # Visit a parse tree produced by ECMAScriptParser#variableDeclaration.
   def visitVariableDeclaration(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitVariableDeclaration")
+      printCtx(ctx)
 
+      if (ctx.getChildCount() == 1):
+          varname = ctx.children[0].accept(self)
+          self.add_instruction(OpCode.DCL, varname)
+          
+      else:
+          varname = ctx.children[0].accept(self)
+          ctx.children[1].accept(self)
+          self.add_instruction(OpCode.STORE, varname)
 
   # Visit a parse tree produced by ECMAScriptParser#catchProduction.
   def visitCatchProduction(self, ctx):
@@ -427,7 +467,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   
   # Visit a parse tree produced by ECMAScriptParser#numericLiteral.
   def visitNumericLiteral(self, ctx):
-    dprint("visitNumericLiteral")
+    txt = "visitNumericLiteral " + str(float(eval(ctx.children[0].symbol.text)))
+    dprint(txt)
     self.add_instruction(OpCode.PUSH, float(eval(ctx.children[0].symbol.text)))
   
 

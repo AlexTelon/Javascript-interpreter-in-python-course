@@ -16,7 +16,7 @@ def main(argv):
   program  = VirtualMachine.Code()
   bytecode = VirtualMachine.BytecodeVisitor(program)
   tree.accept(bytecode)
-  program.print() # Uncomment to print the bytecode
+  #program.print() # Uncomment to print the bytecode
   executor = VirtualMachine.Executor()
   executor.execute(program)
  
