@@ -18,10 +18,11 @@ class Executor:
   '''
   def __init__(self, environment = Environment()):
     self.environment = environment
+
     self.stack  = Stack()
     self.current_index = 0;
-    self.exceptionAddress = None;
-    
+    self.exceptionStack = Stack();
+
     # The following code acts as a switch statements for OpCodes
     self.opmaps  = {}
     # Stack
@@ -95,7 +96,6 @@ class Executor:
       f = self.opmaps[inst.opcode]
       f(self, *inst.params)
       self.current_index = self.current_index + 1        
-        
 
   def execute_push(self, value):
     '''
@@ -275,22 +275,25 @@ class Executor:
     '''
     Execute the TRY_PUSH instruction
     '''
-    self.exceptionAddress = idx
+    self.exceptionStack.push(idx)
 
   def execute_throw(self):
     '''
     Execute the THROW instruction
     '''
-    if self.exceptionAddress is None:
+    if self.exceptionStack.size() > 0:
+      exceptionAddress = self.exceptionStack.pop()
+      self.current_index = exceptionAddress - 1
+    else:
       topStack = self.stack.pop()
       raise ESException(topStack)
-    self.current_index = self.exceptionAddress - 1
+
 
   def execute_try_pop(self):
     '''
     Execute the TRY_POP instruction
     '''
-    self.exceptionAddress = None
+    self.exceptionStack.pop()
 
   def execute_make_array(self, count):
     '''
@@ -535,7 +538,7 @@ class Executor:
     a = self.stack.pop()
     a = int(a)
     val = ~a
-    float(val)
+    val = float(val)
     self.stack.push(val)
 
 
