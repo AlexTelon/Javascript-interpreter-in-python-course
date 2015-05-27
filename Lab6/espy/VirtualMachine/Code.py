@@ -12,11 +12,20 @@ class Code:
     '''
     self.instructions.append(instruction)
 
+  def modify_instruction_arg(self, lineno, *arg):
+    '''
+    Convenience function to modify an instruction to the program
+    '''
+    #print("changed arg to: ", list(arg))
+    self.instructions[lineno].params = list(arg)
+
   def current_index(self):
     '''
     Return the current index, for use in jump instructions, for instnace.
     '''
     return len(self.instructions)
+
+
 
   def print(self):
     '''
