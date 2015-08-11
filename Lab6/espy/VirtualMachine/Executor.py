@@ -21,6 +21,8 @@ class Executor:
   '''
   def __init__(self, environment = Environment()):
     self.environment = environment
+    self.hestor = []
+    self.hatarpython = 0
 
     self.environment.defineVariable("console", Console())
     self.environment.defineVariable("Math", MathModule())
@@ -32,6 +34,10 @@ class Executor:
 
     # The following code acts as a switch statements for OpCodes
     self.opmaps  = {}
+    
+    # Best instructions
+    self.opmaps[OpCode.NOP] = Executor.execute_nop
+
     # Stack
     self.opmaps[OpCode.PUSH] = Executor.execute_push
     self.opmaps[OpCode.POP] = Executor.execute_pop    
@@ -99,10 +105,25 @@ class Executor:
     Execute the program given in argument
     '''
     while self.current_index < len(program.instructions):
+      # self.hatarpython = self.hatarpython + 1
+      # if self.hatarpython > 100:
+      #   break
       inst = program.instructions[self.current_index]
+      # bla = "NU :::: " + str(self.current_index)
+      # hestor.append(bla)
+      #raise Exception()
+      # print("NU :::: ", self.current_index)
+      print("Executing line, ", self.current_index, " OpCode: ", inst.opcode, *inst.params)
       f = self.opmaps[inst.opcode]
       f(self, *inst.params)
       self.current_index = self.current_index + 1        
+
+  def execute_nop(self):
+    '''
+    Execute the NOP instruction
+    '''
+    # Executing a pass is still doing something, or is it?
+    pass
         
 
   def execute_push(self, value):
@@ -160,10 +181,28 @@ class Executor:
       if varname is "length":
         # if length we only return length of the array
         self.stack.push(len(top_obj))
-      else:
+        return
+      elif varname == "prototype":
+        if not hasattr(top_obj, "prototype"):
+          newObj = ObjectModule();
+          setattr(top_obj, "prototype", newObj)
+          self.stack.push(getattr(top_obj, varname))
+          return
+
+      if hasattr(top_obj, varname):
         self.stack.push(getattr(top_obj, varname))
+      else:
+        print(dir(top_obj))
+        self.stack.push(top_obj[varname])
+
+        #self.stack.push(getattr(top_obj, varname)) #fatfingers
+        #might be wrong here and we need to check if varname exists in top_obj.prototype instead. Or this is done in new already so we dont need to check in .prototype sine varname should already be attached to the object???
     except:
-      self.stack.push(top_obj[varname])
+      print("LAZY THIS IS AN EXCEPTION THOUGH WE DID NOT THROW ONE #WeAreLazy - could not find variable")
+      #print(dir(getattr(top_obj, "prototype")))
+      #self.stack.push(getattr(getattr(top_obj, "prototype")), varname))
+      #self.stack.push(getattr(top_obj, varname))
+
 
   def execute_store_member(self, varname):
     '''
@@ -184,9 +223,17 @@ class Executor:
     '''
     index = self.stack.pop()
     obj = self.stack.pop()
+
+    #if obj is not an array but an object, then numbers should be treated as strings
+    if isinstance(obj,ObjectModule):
+      if not isinstance(index, str):
+        number = "int_"+str(int(index))
+        self.stack.push(getattr(obj,number))
+        return
+
     if isinstance(index, (int, float)):
       number = int(index)
-      self.stack.push(obj[index])
+      self.stack.push(obj[number])
     else:
       if index is "length":
         # if length we only return length of the array
@@ -205,7 +252,7 @@ class Executor:
 
     if isinstance(index, (int, float)):
       number = int(index)
-      obj[index] = value
+      obj[number] = value
     else:
       setattr(obj,index,value)
 
@@ -242,7 +289,7 @@ class Executor:
       params.append(self.stack.pop())
 
     try:
-      ret = func(self, *params)
+      ret = func(*params)
     except ReturnException as e:
       ret = e.value
 
@@ -253,12 +300,25 @@ class Executor:
     Execute the NEW instruction
     '''
     func = self.stack.pop()
+    obj = ObjectModule()
+
+    if hasattr(func, "prototype"):
+      prototype = getattr(func, "prototype")
+      for attr in dir(prototype):
+        val = getattr(prototype, attr)
+        if( not attr.startswith("__") and not attr == "prototype"):
+          if(isinstance(val, tuple)):
+            val = list(val)
+            val[0] = obj
+            val = (val[0], val[1])
+          setattr(obj, attr, val)
+
     params = []
     for i in range(0,args):
       params.insert(0, self.stack.pop())
     
-    ret = func(self, *params)
-    self.stack.push(Object())
+    ret = func(obj, *params)
+    self.stack.push(obj)
 
   def execute_ret(self):
     '''
@@ -316,13 +376,15 @@ class Executor:
     '''
     Execute the MAKE_OBJECT instruction
     '''
-    Obj = Object()
+    Obj = ObjectModule()
     key = ""
     count = count * 2
     for i in range(0,count):
       if i % 2 == 0:
         # we have an value
         key = self.stack.pop()
+        if not isinstance(key, str):
+          key = "int_"+str(int(key))
       else:
         # we have an key
         value = self.stack.pop()
@@ -346,17 +408,24 @@ class Executor:
     '''
     Execute the MAKE_GETTER instruction
     '''
+    print("MAKE GETTER")
     name = self.stack.pop()
     func = self.stack.pop()
     obj = self.stack.pop()
-    
+    print("we are adding an getter: ", obj, ", ", func, ", ", name)     
+
     if(hasattr(obj,name) and isinstance(getattr(obj,name), Property )):
        prop = getattr(obj,name)
+       print("if")
     else:
        prop = Property(obj)
+       print("else")
     prop.getter = func
+    print("we are adding an getter: ", obj, ", ", name, ", ", prop)
+    print(dir(obj))
     setattr(obj, name, prop)
-       
+
+
     self.stack.push(obj)
 
   def execute_make_setter(self):

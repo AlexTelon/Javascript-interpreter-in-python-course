@@ -1,6 +1,7 @@
 #Generated from java-escape by ANTLR 4.4
 import antlr4
 import Utils
+import ECMAScriptParser
 
 from VirtualMachine.OpCode      import OpCode
 from VirtualMachine.Code        import Code
@@ -49,7 +50,7 @@ def sPrintCtx(ctx):
     print("")
 
 def dprint(*string):
-    if 1==2:
+    if 1==1:
         for s in string:
             print(s, end="")
             print(" ", end="")
@@ -84,24 +85,35 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#ArgumentsExpression.
   def visitArgumentsExpression(self, ctx):
     dprint("visitArugmentsExpression")
-    #printCtx(ctx)
+    # printCtx(ctx)
     #ordering is important!
     #many accepts do stuff on the stack for you!
     args = ctx.children[1].accept(self)
-    #print("args argumentsExpression: ", args)
+    linebefore = self.program.current_index()
+    this = ctx.children[0].children[0].accept(self) #accetp returns nothing but pushes to stack if "this" exists. If it does not exist it returns something...
+    lineafter = self.program.current_index()
+
+    args = args + 1
+    if linebefore == lineafter:
+        self.add_instruction(OpCode.PUSH, None)
 
     func = ctx.children[0].accept(self)
-    #print("func argumentsExpression: ", func)
-
-    if args is None:
-      args = []
-        
     self.add_instruction(OpCode.CALL, args)
      
   
   # Visit a parse tree produced by ECMAScriptParser#elementList.
   def visitElementList(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+    dprint("visitElementList")
+    #printCtx(ctx)
+    i = 0
+    for child in ctx.children:
+        value = child.accept(self)
+        if not value == ",":
+            # print("value hest is: ", value)
+            # self.add_instruction(OpCode.PUSH, value)
+            i = i + 1
+    self.add_instruction(OpCode.MAKE_ARRAY, i)
+
   
   # Visit a parse tree produced by ECMAScriptParser#ForInStatement.
   def visitForInStatement(self, ctx):
@@ -115,29 +127,81 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#NewExpression.
   def visitNewExpression(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitNewExpression")
+
+      nrOfParams = ctx.children[2].accept(self) #() - params
+      ctx.children[1].accept(self) #Object
+      self.add_instruction(OpCode.NEW, nrOfParams)
+
 
   # Visit a parse tree produced by ECMAScriptParser#MemberDotExpression.
   def visitMemberDotExpression(self, ctx):
       dprint("visitMemberDotExpression")
       #printCtx(ctx)
       obj    = ctx.children[0].accept(self)
-      #print("obj: ", obj)
 
+      # print("obj: ", ctx.children[0].children[0].symbol.text)
       member = ctx.children[2].accept(self)
-      #print("member: ", member)
-      
+      # print("member: ", member)
+
       # on top of stack we have obj
       self.add_instruction(OpCode.LOAD_MEMBER, member)
       
     # Visit a parse tree produced by ECMAScriptParser#tryStatement.
   def visitTryStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitTryStatement")
+      
+      """
+      <code>
+      throw:
+      {try push hest
+      push throw text
+      throw
+      }
+      jmp finally
+      hest:
+      store/pop->err
+      <code>
+
+      finally:
+      <code>
+      """
+      catchAddr = 1337
+      finallyAddr = 1338
+
+      TRYPUSHAddr = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, catchAddr)
+      
+      ctx.children[1].accept(self) # code to run
+      
+      JMPAddr = self.program.current_index()      
+      self.add_instruction(OpCode.JMP, finallyAddr)
+      
+      catchAddr = self.program.current_index()
+      self.program.modify_instruction_arg(TRYPUSHAddr, catchAddr)
+      ctx.children[2].accept(self) #catch code to run
+      #fix text to print thing
+      
+      finallyAddr = self.program.current_index()
+      self.program.modify_instruction_arg(JMPAddr, finallyAddr)
+
+      # finally
+      if ctx.getChildCount() == 4:
+          ctx.children[3].accept(self) #code to run
+      
+      
+  # except ThrowException as e:
+  #         msg = str(e)
+  #         catchBlock = ctx.children[2]
+  #         self.environment.defineVariable(catchBlock.children[2].accept(self), msg)
+  #         catchBlock.accept(self) # catch
+          
+
 
   # Visit a parse tree produced by ECMAScriptParser#DoStatement.
   def visitDoStatement(self, ctx):
       dprint("visitDoStatement")
-      printCtx(ctx)
+      #printCtx(ctx)
       # [0] = do, [1] = block, [2] = while, [3] = (, [4] = condition, [5] = )
       # run the do-block once
       doStart = self.program.current_index()
@@ -151,10 +215,17 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#WhileStatement.
   def visitWhileStatement(self, ctx):
       dprint("visitWhileStatement")
-      printCtx(ctx)
+      #printCtx(ctx)
 
       # check condition and jump over if false
       placeholderAddr = 1337
+
+      breakAddr = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, placeholderAddr)
+
+      continueStart = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, continueStart)
+
       whileStart = self.program.current_index()
       ctx.children[2].accept(self) # True/False value paused to stack 
       unlessJmpAddr = self.program.current_index()
@@ -166,20 +237,85 @@ class BytecodeVisitor(ECMAScriptVisitor):
       
       exitWhileAddr = self.program.current_index()
       self.program.modify_instruction_arg(unlessJmpAddr, exitWhileAddr)
-
+      self.program.modify_instruction_arg(breakAddr, exitWhileAddr)
+      
 
   # Visit a parse tree produced by ECMAScriptParser#returnStatement.
   def visitReturnStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitReturnStatement")
+      ctx.children[1].accept(self)
+      self.add_instruction(OpCode.RET)
 
 
   # Visit a parse tree produced by ECMAScriptParser#switchStatement.
   def visitSwitchStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitSwitchStatement")
+      ctx.children[2].accept(self) # variable pushes itself onto the stack
+      ctx.children[4].accept(self) # deal with it
   
     # Visit a parse tree produced by ECMAScriptParser#FunctionExpression.
   def visitFunctionExpression(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+        dprint("visitFunctionExpression")
+        isLambda = False
+        
+        if(isinstance(ctx.children[2], antlr4.tree.Tree.TerminalNodeImpl) 
+           and isinstance(ctx.children[3], antlr4.tree.Tree.TerminalNodeImpl)):
+            # haz no parameters
+            if ctx.getChildCount() == 7:
+                # Normal function, so we have a name
+
+                self.add_instruction(OpCode.PUSH, []) # add an empty param
+
+                program  = Code()
+                bytecode = BytecodeVisitor(program)
+                ctx.children[5].accept(bytecode) # save the bytecode of the body in the var bytecode
+                self.add_instruction(OpCode.PUSH, program)
+                self.add_instruction(OpCode.MAKE_FUNC)
+
+                functionName = ctx.children[1].accept(self)
+
+
+            elif ctx.getChildCount() == 6:
+                # Lambda function, return function only
+                # setup the function bits
+                isLambda = True
+
+                self.add_instruction(OpCode.PUSH, []) # add an empty param
+
+                program  = Code()
+                bytecode = BytecodeVisitor(program)
+                ctx.children[4].accept(bytecode) # save the bytecode of the body in the var bytecode
+                self.add_instruction(OpCode.PUSH, program)
+                self.add_instruction(OpCode.MAKE_FUNC)
+
+        else: # haz parameters
+            if ctx.getChildCount() == 8:
+                # Normal function, so we have a name
+
+                ctx.children[3].accept(self) #add params to stack
+                program  = Code()
+                bytecode = BytecodeVisitor(program)
+                ctx.children[6].accept(bytecode) # save the bytecode of the body in the var bytecode
+                self.add_instruction(OpCode.PUSH, program)
+                self.add_instruction(OpCode.MAKE_FUNC)
+                functionName = ctx.children[1].accept(self)
+
+            elif ctx.getChildCount() == 7:
+                # Lambda function, return function only
+                # setup the function bits
+                isLambda = True
+
+                ctx.children[2].accept(self) #add params to stack
+
+                program  = Code()
+                bytecode = BytecodeVisitor(program)
+                ctx.children[5].accept(bytecode) # save the bytecode of the body in the var bytecode
+                self.add_instruction(OpCode.PUSH, program)
+                self.add_instruction(OpCode.MAKE_FUNC)
+
+        if not isLambda:
+            self.add_instruction(OpCode.STORE, functionName)
+
 
   # Visit a parse tree produced by ECMAScriptParser#defaultClause.
   def visitDefaultClause(self, ctx):
@@ -188,7 +324,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#ForStatement.
   def visitForStatement(self, ctx):
       dprint("visitForStatement")
-      printCtx(ctx)
       # [0] = for, [1] = (, [2] = assignment/starting value, [3] = ;, 
       # [4] = end condition, [5] = ; , [6] = change of var or whatever
       # [7] = ), [8] = block
@@ -227,50 +362,125 @@ class BytecodeVisitor(ECMAScriptVisitor):
           bodyIndex = incrementThingIndex + 2
       
       placeholderAddr = 1337
+
+      breakAddr = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, placeholderAddr)
+
+      continueStart = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, continueStart)
+
       forStart = self.program.current_index()
 
       if noCondition:
           self.add_instruction(OpCode.PUSH, True)
       else:
-          ctx.children[conditionIndex].accept(self) # True/False value pused to stack 
+          ctx.children[conditionIndex].accept(self) # True/False value pushed to stack 
 
       unlessJmpAddr = self.program.current_index()
       self.add_instruction(OpCode.UNLESSJMP, placeholderAddr)
 
       # code to run
       ctx.children[bodyIndex].accept(self)
+
+      # Jump over try_push, try_push should only be reached from throw(continue)
+      self.add_instruction(OpCode.JMP, self.program.current_index()+2)
+      continueAddr = self.program.current_index()
+      self.add_instruction(OpCode.TRY_PUSH, continueAddr)
       ctx.children[incrementThingIndex].accept(self)
+
       #ctx.children[6].accept(self) # run the increment of var or whatever
       self.add_instruction(OpCode.JMP, forStart)
       
       exitForAddr = self.program.current_index()
       self.program.modify_instruction_arg(unlessJmpAddr, exitForAddr)
+      self.program.modify_instruction_arg(breakAddr, exitForAddr)
+      self.program.modify_instruction_arg(continueStart, continueAddr)
 
 
   # Visit a parse tree produced by ECMAScriptParser#caseBlock.
   def visitCaseBlock(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitCaseBlock")
+      #printCtx(ctx,5)
+
+      ###Don't forget TRY_PUSH here!###
+      # Should have placeholder that is replaced with address out of switch/case(to jump out)
+      placeholderAddr = 1337
+      defalutAddr = None
+      breakAddr = self.program.current_index()      
+      self.add_instruction(OpCode.TRY_PUSH, placeholderAddr)
+      self.add_instruction(OpCode.TRY_PUSH, placeholderAddr) # dummy try_push beacuse break does pop first
+
+      #push placeholder jump-table
+      jumpTableAddr = self.program.current_index()
+      jumpTable = {}
+      self.add_instruction(OpCode.PUSH, {})
+
+      switchAddr = self.program.current_index()
+      self.add_instruction(OpCode.SWITCH, placeholderAddr)
+      
+      for child in ctx.children:
+          if(not isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)): # Skip "{ and }"            
+              #VARNING, fulhack
+              if(isinstance(child.children[1], antlr4.tree.Tree.TerminalNodeImpl)):
+                  caseVal = child.children[1].symbol.text
+              else:
+                  caseVal = child.children[1].children[0].children[0].children[0].children[0].symbol.text
+
+              if caseVal == ":": #Default
+                  #There is a default case, save it in case we need it
+                  defalutAddr = self.program.current_index()
+                  child.children[2].accept(self)
+              else:
+                  caseVal = int(caseVal) # Nothing to see, move on
+                  #Add to jump table
+                  jmpAddr = self.program.current_index()
+                  jumpTable[caseVal] = jmpAddr
+                  #code to run here
+                  child.children[3].accept(self)
+
+ 
+      self.add_instruction(OpCode.TRY_POP)
+      self.add_instruction(OpCode.TRY_POP)
+ 
+      ### Fix placeholder stuff (jump table, try_push)
+      self.program.modify_instruction_arg(jumpTableAddr, jumpTable)
+
+      exitSwitchAddr = self.program.current_index()
+      self.program.modify_instruction_arg(breakAddr, exitSwitchAddr)
+      if defalutAddr is None:
+          defalutAddr = exitSwitchAddr
+      self.program.modify_instruction_arg(switchAddr,defalutAddr)
 
   # Visit a parse tree produced by ECMAScriptParser#objectLiteral.
   def visitObjectLiteral(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitObjectLiteral")
+      i = 0
+      for child in ctx.children:
+          if not isinstance(child, antlr4.tree.Tree.TerminalNodeImpl):
+              child.accept(self)
+              i = i + 1
+      self.add_instruction(OpCode.MAKE_OBJECT, i)      
 
 
   # Visit a parse tree produced by ECMAScriptParser#throwStatement.
   def visitThrowStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
-
+      dprint("visitThrowStatement")
+      message = ctx.children[1].children[0].children[0].children[0].symbol.text
+      message = message[1:-1]
+      self.add_instruction(OpCode.PUSH, message)      
+      self.add_instruction(OpCode.THROW)
 
   # Visit a parse tree produced by ECMAScriptParser#breakStatement.
   def visitBreakStatement(self, ctx):
       dprint("visitBreakStatement")
+      self.add_instruction(OpCode.TRY_POP)
       self.add_instruction(OpCode.THROW)
 
   # Visit a parse tree produced by ECMAScriptParser#ifStatement.
   def visitIfStatement(self, ctx):
       dprint("visitIfStatement")
       
-      ctx.children[2].accept(self) # True/False value pused to stack 
+      ctx.children[2].accept(self) # True/False value pushed to stack 
       placeHolderIFPosition = self.program.current_index()
       self.add_instruction(OpCode.UNLESSJMP, 1337)
       ctx.children[4].accept(self)
@@ -294,7 +504,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#variableDeclaration.
   def visitVariableDeclaration(self, ctx):
       dprint("visitVariableDeclaration")
-      printCtx(ctx)
 
       if (ctx.getChildCount() == 1):
           varname = ctx.children[0].accept(self)
@@ -307,21 +516,23 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#catchProduction.
   def visitCatchProduction(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+      dprint("visitCatchProduction")
+      err = ctx.children[2].accept(self) # tha variable
+      #print("error variable is: ", err)
+      self.add_instruction(OpCode.STORE, err) #we are here and want to kinda do this wihtout ruining this variable if it existed before. Need a nice solution to save either store the variable in a tmp var while the catch-block is running or we need to change something in how Environment operates so it does not give an python-exception. Or somehow have a local variable for err.
+      
+      ctx.children[4].accept(self) # tha code to run
 
 
-  # Visit a parse tree produced by ECMAScriptParser#continueStatement.
+
+  # Visit a parse tree produced by ECMAScriptParser#copntinueStatement.
   def visitContinueStatement(self, ctx):
       dprint("visitContinueStatement")
-      #self.add_instruction(
-      raise Utils.UnimplementedVisitorException(ctx)
-
+      self.add_instruction(OpCode.THROW)
 
   # Visit a parse tree produced by ECMAScriptParser#caseClause.
   def visitCaseClause(self, ctx):
       raise Utils.UnimplementedVisitorException(ctx)
-
-      
   
   
   def gen_setter(self, a, idx, b):
@@ -404,6 +615,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
     name = ctx.children[0].accept(self)
     if(name != None):
       self.add_instruction(OpCode.PUSH, name)
+      
 
 
   # Visit a parse tree produced by ECMAScriptParser#assignmentOperator.
@@ -432,14 +644,11 @@ class BytecodeVisitor(ECMAScriptVisitor):
   def visitArgumentList(self, ctx):
     dprint("visitArgumentList")
     count = 0
-    for c in ctx.children:
+    for c in reversed(ctx.children): #we did reversed() here before to fix things, but it broke more things
       if(not isinstance(c, antlr4.tree.Tree.TerminalNodeImpl)): # Skip ","
         c.accept(self)
         count += 1
     return count
-
-
- 
 
 
   # Visit a parse tree produced by ECMAScriptParser#ThisExpression.
@@ -461,8 +670,47 @@ class BytecodeVisitor(ECMAScriptVisitor):
     dprint("visitBinaryExpression")
     op  = ctx.children[1].accept(self)
     
-    ctx.children[0].accept(self)
-    ctx.children[2].accept(self)
+    if(op == '&&'):
+        placeholderAddr = 1337
+        ctx.children[0].accept(self)
+        #INTENDERINGSPROBELM: VI HAR INTE TEstat om && eller || funkar än men tror att de borde funka nu.
+        #Vi är på tests 07_normal_order
+        if1 = self.program.current_index()
+        self.add_instruction(OpCode.UNLESSJMP, placeholderAddr) # if false
+        ctx.children[2].accept(self)
+        
+        if2 = self.program.current_index()
+        self.add_instruction(OpCode.JMP, placeholderAddr+1) # if true
+        jump1 = self.program.current_index()
+        self.add_instruction(OpCode.PUSH, False)
+
+        self.program.modify_instruction_arg(if1, jump1)
+        self.program.modify_instruction_arg(if2, jump1+1)
+        return;
+    elif(op == '||'):
+        placeholderAddr = 1337
+        ctx.children[0].accept(self)
+        
+        if1 = self.program.current_index()
+        self.add_instruction(OpCode.IFJMP, placeholderAddr) # if false
+        ctx.children[2].accept(self)
+
+        if2 = self.program.current_index()
+        self.add_instruction(OpCode.JMP, placeholderAddr+1) # if true
+        jump1 = self.program.current_index()
+        self.add_instruction(OpCode.PUSH, True)
+
+        self.program.modify_instruction_arg(if1, jump1)
+        self.program.modify_instruction_arg(if2, jump1+1)
+        return;
+
+    if(op == '+'):
+        ctx.children[2].accept(self)
+        ctx.children[0].accept(self)
+    else:
+        ctx.children[0].accept(self)
+        ctx.children[2].accept(self)
+
     if(op == '+'):
       self.add_instruction(OpCode.ADD)
     elif(op == '-'):
@@ -491,9 +739,9 @@ class BytecodeVisitor(ECMAScriptVisitor):
       self.add_instruction(OpCode.EQUAL)
     elif(op == '!=' or op == '!=='):
       self.add_instruction(OpCode.DIFFERENT)
-    elif(op == '&&'):
+    elif(op == '&'):
       self.add_instruction(OpCode.AND)
-    elif(op == '||'):
+    elif(op == '|'):
       self.add_instruction(OpCode.OR)
     else:
       raise Utils.UnknownOperator(op)
@@ -519,7 +767,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#PropertyGetter.
   def visitPropertyGetter(self, ctx):
     dprint("visitPropertyGetter")
-    func_code     = VirtualMachine.Code()
+    func_code = Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[5].accept(bv)
     self.add_instruction(OpCode.PUSH, [])
@@ -562,7 +810,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#PropertySetter.
   def visitPropertySetter(self, ctx):
     dprint("visitPropertySetter")
-    func_code     = VirtualMachine.Code()
+    func_code = Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[6].accept(bv)
     self.add_instruction(OpCode.PUSH, [ctx.children[3].accept(self)])
@@ -586,22 +834,30 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#withStatement.
   def visitWithStatement(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+    raise Utils.UnimplementedVisitorException(ctx)
 
 
   # Visit a parse tree produced by ECMAScriptParser#MemberIndexExpression.
   def visitMemberIndexExpression(self, ctx):
-      raise Utils.UnimplementedVisitorException(ctx)
+    # Should return a[1], a value from array
+    # a [ list ]
+    dprint("visitMemberIndexExpression")
+    ctx.children[0].accept(self) #get name and load it
+    ctx.children[2].accept(self) #put index on stack
+    dprint("visitMemberIndexExpression-still")
+    self.add_instruction(OpCode.LOAD_INDEX)
 
 
   # Visit a parse tree produced by ECMAScriptParser#formalParameterList.
   def visitFormalParameterList(self, ctx):
     dprint("visitFormalParameterList")
+    #printCtx(ctx)
     args = []
-    for c in ctx.children:
-      if(c.symbol.type == ECMAScriptParser.Lexer.Identifier):
-        args.append(c.symbol.text)
-    return args
+    for c in reversed(ctx.children):
+        #if(c.symbol.type == ECMAScriptParser.Lexer.Identifier): WHERE DID IDENTIFIER GO?
+        if not c.symbol.text == ",":
+            args.append(c.symbol.text)
+    self.add_instruction(OpCode.PUSH, args)
 
 
   # Visit a parse tree produced by ECMAScriptParser#incrementOperator.
@@ -793,7 +1049,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
 
   # Visit a parse tree produced by ECMAScriptParser#propertyName.
   def visitPropertyName(self, ctx):
-    dprint("visitPropertyName")
+    dprint("visitPropertyName") #CHECK THIS OUT YO. Elemensts in 08/08 should not be a str but an ObjectModule
+    asdkjl
     child = ctx.children[0]
     
     if(isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)):
@@ -804,7 +1061,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
     r = child.accept(self)
     if(r != None):
       self.add_instruction(OpCode.PUSH, r)
-  
 
 
   # Visit a parse tree produced by ECMAScriptParser#arguments.

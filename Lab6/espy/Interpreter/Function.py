@@ -50,6 +50,7 @@ class Function:
     * args is the list of arguments passed to the function
     '''
 
+    #    print("call ", self, " ", that, " " ,this, " ", *args)
     self.environment = Environment(self.parentEnv)
     self.environment.defineVariable("this", this)
     i = 0

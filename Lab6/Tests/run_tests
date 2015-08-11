@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ESPY_DIR="`pwd`/$1"
+DIR=$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+$DIR/espytester.py $DIR/../espy/esvm.py $DIR/.. $1

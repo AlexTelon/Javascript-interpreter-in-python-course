@@ -2,7 +2,7 @@ from Interpreter.Property import Property
 
 class Object:
   def __init__(self):
-      pass
+    pass
 
 class ObjectModule:
   def __init__(self):
