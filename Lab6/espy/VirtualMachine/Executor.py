@@ -37,6 +37,8 @@ class Executor:
     
     # Best instructions
     self.opmaps[OpCode.NOP] = Executor.execute_nop
+    self.opmaps[OpCode.DEBUG] = Executor.execute_debug
+    self.opmaps[OpCode.STACKDUMP] = Executor.execute_stackdump
 
     # Stack
     self.opmaps[OpCode.PUSH] = Executor.execute_push
@@ -113,7 +115,7 @@ class Executor:
       # hestor.append(bla)
       #raise Exception()
       # print("NU :::: ", self.current_index)
-      print("Executing line, ", self.current_index, " OpCode: ", inst.opcode, *inst.params)
+      #print("Executing line, ", self.current_index, " OpCode: ", inst.opcode, *inst.params)
       f = self.opmaps[inst.opcode]
       f(self, *inst.params)
       self.current_index = self.current_index + 1        
@@ -170,36 +172,60 @@ class Executor:
     '''
     self.environment.defineVariable(varname)
 
-  def execute_load_member(self, varname):
+  def execute_load_member(self, varname, dontRun = False):
     '''
     Execute the LOAD_MEMBER instruction
     '''
     # self.stack.dup() # make sure we still have a copy of the top element after the pop below
     # print("derp: ", self.stack.pop().a)
     top_obj = self.stack.pop()
+    #print("top_obj is ", top_obj)
+    #print("top_obj dir ", dir(top_obj));
+    #print("varname is: ", varname)
     try:
-      if varname is "length":
+      if varname == "length":
         # if length we only return length of the array
-        self.stack.push(len(top_obj))
+        self.stack.push(float(len(top_obj)))
         return
+
       elif varname == "prototype":
         if not hasattr(top_obj, "prototype"):
           newObj = ObjectModule();
           setattr(top_obj, "prototype", newObj)
           self.stack.push(getattr(top_obj, varname))
           return
+ 
+      elif varname == "append":
+
+        def ownappend(collection, params):
+          collection.append(params)
+          return params
+        
+        self.stack.push(ownappend)
+        return
 
       if hasattr(top_obj, varname):
-        self.stack.push(getattr(top_obj, varname))
+        getSetObj = getattr(top_obj, varname)
+
+        #check if it is a property obj that has a getter, in that case call it
+        if isinstance(getSetObj, Property):
+          if not getSetObj.getter is None and not dontRun:
+            self.stack.push(top_obj) #None(=None) or this (=top_obj)? 
+            self.stack.push(getSetObj.getter)
+            self.execute_call(1)
+            return
+        
+        self.stack.push(getSetObj)
+
       else:
-        print(dir(top_obj))
         self.stack.push(top_obj[varname])
 
         #self.stack.push(getattr(top_obj, varname)) #fatfingers
         #might be wrong here and we need to check if varname exists in top_obj.prototype instead. Or this is done in new already so we dont need to check in .prototype sine varname should already be attached to the object???
-    except:
+    except Exception as e:
       print("LAZY THIS IS AN EXCEPTION THOUGH WE DID NOT THROW ONE #WeAreLazy - could not find variable")
-      #print(dir(getattr(top_obj, "prototype")))
+      print(e)
+      #print(dir(top_obj))
       #self.stack.push(getattr(getattr(top_obj, "prototype")), varname))
       #self.stack.push(getattr(top_obj, varname))
 
@@ -210,7 +236,19 @@ class Executor:
     '''
     obj = self.stack.pop()
     self.stack.dup()
-    member = self.stack.pop()
+    member = self.stack.pop() #value
+
+    if hasattr(obj, varname):
+      getSetObj = getattr(obj, varname)
+      if isinstance(getSetObj, Property):
+        if getSetObj.setter is not None:
+          self.stack.push(member)
+          self.stack.push(obj)
+          self.stack.push(getSetObj.setter)
+          self.execute_call(2)
+          self.stack.pop()
+          return
+
     if isinstance(varname, (int, float)):
       index = int(varname)
       obj[index] = member
@@ -235,7 +273,7 @@ class Executor:
       number = int(index)
       self.stack.push(obj[number])
     else:
-      if index is "length":
+      if index == "length":
         # if length we only return length of the array
         self.stack.push(len(obj))
       else:
@@ -285,10 +323,14 @@ class Executor:
     '''
     func = self.stack.pop()
     params = []
+
     for i in range(0,args):
       params.append(self.stack.pop())
 
     try:
+      #print("*params: ", *params)
+      #print("params: ", params)
+      #print("func: ", func)
       ret = func(*params)
     except ReturnException as e:
       ret = e.value
@@ -389,6 +431,7 @@ class Executor:
         # we have an key
         value = self.stack.pop()
         setattr(Obj, key, value)
+
     self.stack.push(Obj)
 
   def execute_make_func(self):
@@ -408,23 +451,17 @@ class Executor:
     '''
     Execute the MAKE_GETTER instruction
     '''
-    print("MAKE GETTER")
     name = self.stack.pop()
     func = self.stack.pop()
     obj = self.stack.pop()
-    print("we are adding an getter: ", obj, ", ", func, ", ", name)     
 
     if(hasattr(obj,name) and isinstance(getattr(obj,name), Property )):
        prop = getattr(obj,name)
-       print("if")
     else:
        prop = Property(obj)
-       print("else")
     prop.getter = func
-    print("we are adding an getter: ", obj, ", ", name, ", ", prop)
-    print(dir(obj))
+    #print(dir(obj))
     setattr(obj, name, prop)
-
 
     self.stack.push(obj)
 
@@ -626,3 +663,15 @@ class Executor:
     a = self.stack.pop()
     val = not a
     self.stack.push(val)
+
+  def execute_debug(self, txt):
+    '''
+    Execute our own debug instruction
+    '''
+    pass
+
+  def execute_stackdump(self):
+    '''
+    Execute our own stack thing instruction
+    '''
+    print(self.stack.stack)

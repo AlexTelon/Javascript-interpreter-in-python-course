@@ -575,6 +575,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
     dprint("gen_stter_dot")
     a.accept(self)
     self.add_instruction(OpCode.STORE_MEMBER, idx)
+
     
   def gen_getter_dot(self, a, idx):
     dprint("gen_getter_dot")
@@ -770,12 +771,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
     func_code = Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[5].accept(bv)
+
+    tmp = ObjectModule()
+    self.add_instruction(OpCode.PUSH, tmp)
+
     self.add_instruction(OpCode.PUSH, [])
     self.add_instruction(OpCode.PUSH, func_code)
     self.add_instruction(OpCode.MAKE_FUNC)
     self.add_instruction(OpCode.PUSH, ctx.children[1].accept(self))
     self.add_instruction(OpCode.MAKE_GETTER)
 
+    self.add_instruction(OpCode.LOAD_MEMBER, ctx.children[1].accept(self), True) #extract the getter
+    self.add_instruction(OpCode.PUSH, ctx.children[1].accept(self)) #name again
+    
 
   # Visit a parse tree produced by ECMAScriptParser#block.
   def visitBlock(self, ctx):
@@ -813,11 +821,19 @@ class BytecodeVisitor(ECMAScriptVisitor):
     func_code = Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[6].accept(bv)
+
+    tmp = ObjectModule()
+    self.add_instruction(OpCode.PUSH, tmp)
+
     self.add_instruction(OpCode.PUSH, [ctx.children[3].accept(self)])
     self.add_instruction(OpCode.PUSH, func_code)
     self.add_instruction(OpCode.MAKE_FUNC)
-    self.add_instruction(OpCode.PUSH, ctx.children[1].accept(self))
+    self.add_instruction(OpCode.PUSH, ctx.children[1].accept(self)) #push name
     self.add_instruction(OpCode.MAKE_SETTER)
+
+    self.add_instruction(OpCode.LOAD_MEMBER, ctx.children[1].accept(self), True) #extract the getter
+    self.add_instruction(OpCode.PUSH, ctx.children[1].accept(self)) #name again
+
 
 
   # Visit a parse tree produced by ECMAScriptParser#LiteralExpression.
@@ -887,7 +903,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
     operator = operator.accept(self)
     value.accept(self)
     if(operator == "="):
-      variable_setter()
+        variable_setter()
+
     elif(operator == "+="):
       variable_getter()
       self.add_instruction(OpCode.ADD)
@@ -1050,7 +1067,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#propertyName.
   def visitPropertyName(self, ctx):
     dprint("visitPropertyName") #CHECK THIS OUT YO. Elemensts in 08/08 should not be a str but an ObjectModule
-    asdkjl
     child = ctx.children[0]
     
     if(isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)):

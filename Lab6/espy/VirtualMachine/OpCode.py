@@ -62,3 +62,10 @@ class OpCode(Enum):
   NEG             = 70 # Push the unary negation of the top element.
   TILDE           = 71  
   NOT             = 72 
+
+  #wololo
+  DEBUG           = 1337
+  STACKDUMP           = 1373
+
+
+

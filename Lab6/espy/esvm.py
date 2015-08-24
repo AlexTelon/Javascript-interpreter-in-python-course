@@ -17,6 +17,7 @@ def main(argv):
   bytecode = VirtualMachine.BytecodeVisitor(program)
   tree.accept(bytecode)
   #program.print() # Uncomment to print the bytecode
+  #aiwodha
   executor = VirtualMachine.Executor()
   executor.execute(program)
  

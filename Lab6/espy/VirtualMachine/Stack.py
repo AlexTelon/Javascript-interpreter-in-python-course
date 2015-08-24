@@ -4,7 +4,14 @@ class Stack:
   '''
   def __init__(self):
     self.stack = []
-  
+
+  def toS(self):
+    '''
+    prints the stack
+    '''
+    print(self.stack)
+
+        
   def pop(self):
     '''
     Remove the top element of the stack
