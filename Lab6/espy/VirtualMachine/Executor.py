@@ -107,15 +107,9 @@ class Executor:
     Execute the program given in argument
     '''
     while self.current_index < len(program.instructions):
-      # self.hatarpython = self.hatarpython + 1
-      # if self.hatarpython > 100:
-      #   break
       inst = program.instructions[self.current_index]
-      # bla = "NU :::: " + str(self.current_index)
-      # hestor.append(bla)
-      #raise Exception()
-      # print("NU :::: ", self.current_index)
-      #print("Executing line, ", self.current_index, " OpCode: ", inst.opcode, *inst.params)
+
+      # print("Executing line, ", self.current_index, " OpCode: ", inst.opcode, *inst.params)
       f = self.opmaps[inst.opcode]
       f(self, *inst.params)
       self.current_index = self.current_index + 1        
@@ -176,12 +170,7 @@ class Executor:
     '''
     Execute the LOAD_MEMBER instruction
     '''
-    # self.stack.dup() # make sure we still have a copy of the top element after the pop below
-    # print("derp: ", self.stack.pop().a)
     top_obj = self.stack.pop()
-    #print("top_obj is ", top_obj)
-    #print("top_obj dir ", dir(top_obj));
-    #print("varname is: ", varname)
     try:
       if varname == "length":
         # if length we only return length of the array
@@ -214,21 +203,23 @@ class Executor:
             self.stack.push(getSetObj.getter)
             self.execute_call(1)
             return
+
+        if isinstance(getSetObj, ObjectModule):
+          if hasattr(getSetObj, "get") and not dontRun:
+            self.stack.push(top_obj)
+            self.stack.push(getSetObj.get)
+            self.execute_call(1)
+            return
         
         self.stack.push(getSetObj)
 
       else:
         self.stack.push(top_obj[varname])
 
-        #self.stack.push(getattr(top_obj, varname)) #fatfingers
         #might be wrong here and we need to check if varname exists in top_obj.prototype instead. Or this is done in new already so we dont need to check in .prototype sine varname should already be attached to the object???
     except Exception as e:
       print("LAZY THIS IS AN EXCEPTION THOUGH WE DID NOT THROW ONE #WeAreLazy - could not find variable")
       print(e)
-      #print(dir(top_obj))
-      #self.stack.push(getattr(getattr(top_obj, "prototype")), varname))
-      #self.stack.push(getattr(top_obj, varname))
-
 
   def execute_store_member(self, varname):
     '''
@@ -237,7 +228,6 @@ class Executor:
     obj = self.stack.pop()
     self.stack.dup()
     member = self.stack.pop() #value
-
     if hasattr(obj, varname):
       getSetObj = getattr(obj, varname)
       if isinstance(getSetObj, Property):
@@ -248,6 +238,15 @@ class Executor:
           self.execute_call(2)
           self.stack.pop()
           return
+      elif isinstance(getSetObj, ObjectModule):
+        if hasattr(getSetObj, "set"):
+          self.stack.push(member)
+          self.stack.push(obj)
+          self.stack.push(getSetObj.set)
+          self.execute_call(2)
+          self.stack.pop()
+          return
+
 
     if isinstance(varname, (int, float)):
       index = int(varname)
@@ -304,7 +303,6 @@ class Executor:
     '''
     Execute the IFJMP instruction
     '''
-
     bool = self.stack.pop()
     if bool:
       self.current_index = idx - 1
@@ -328,9 +326,6 @@ class Executor:
       params.append(self.stack.pop())
 
     try:
-      #print("*params: ", *params)
-      #print("params: ", params)
-      #print("func: ", func)
       ret = func(*params)
     except ReturnException as e:
       ret = e.value

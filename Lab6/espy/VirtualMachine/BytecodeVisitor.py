@@ -50,7 +50,7 @@ def sPrintCtx(ctx):
     print("")
 
 def dprint(*string):
-    if 1==1:
+    if 1==2:
         for s in string:
             print(s, end="")
             print(" ", end="")
@@ -85,7 +85,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#ArgumentsExpression.
   def visitArgumentsExpression(self, ctx):
     dprint("visitArugmentsExpression")
-    # printCtx(ctx)
     #ordering is important!
     #many accepts do stuff on the stack for you!
     args = ctx.children[1].accept(self)
@@ -104,13 +103,10 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#elementList.
   def visitElementList(self, ctx):
     dprint("visitElementList")
-    #printCtx(ctx)
     i = 0
     for child in ctx.children:
         value = child.accept(self)
         if not value == ",":
-            # print("value hest is: ", value)
-            # self.add_instruction(OpCode.PUSH, value)
             i = i + 1
     self.add_instruction(OpCode.MAKE_ARRAY, i)
 
@@ -137,12 +133,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#MemberDotExpression.
   def visitMemberDotExpression(self, ctx):
       dprint("visitMemberDotExpression")
-      #printCtx(ctx)
       obj    = ctx.children[0].accept(self)
-
-      # print("obj: ", ctx.children[0].children[0].symbol.text)
       member = ctx.children[2].accept(self)
-      # print("member: ", member)
 
       # on top of stack we have obj
       self.add_instruction(OpCode.LOAD_MEMBER, member)
@@ -150,22 +142,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
     # Visit a parse tree produced by ECMAScriptParser#tryStatement.
   def visitTryStatement(self, ctx):
       dprint("visitTryStatement")
-      
-      """
-      <code>
-      throw:
-      {try push hest
-      push throw text
-      throw
-      }
-      jmp finally
-      hest:
-      store/pop->err
-      <code>
-
-      finally:
-      <code>
-      """
       catchAddr = 1337
       finallyAddr = 1338
 
@@ -188,20 +164,11 @@ class BytecodeVisitor(ECMAScriptVisitor):
       # finally
       if ctx.getChildCount() == 4:
           ctx.children[3].accept(self) #code to run
-      
-      
-  # except ThrowException as e:
-  #         msg = str(e)
-  #         catchBlock = ctx.children[2]
-  #         self.environment.defineVariable(catchBlock.children[2].accept(self), msg)
-  #         catchBlock.accept(self) # catch
-          
 
 
   # Visit a parse tree produced by ECMAScriptParser#DoStatement.
   def visitDoStatement(self, ctx):
       dprint("visitDoStatement")
-      #printCtx(ctx)
       # [0] = do, [1] = block, [2] = while, [3] = (, [4] = condition, [5] = )
       # run the do-block once
       doStart = self.program.current_index()
@@ -215,7 +182,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#WhileStatement.
   def visitWhileStatement(self, ctx):
       dprint("visitWhileStatement")
-      #printCtx(ctx)
 
       # check condition and jump over if false
       placeholderAddr = 1337
@@ -400,9 +366,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#caseBlock.
   def visitCaseBlock(self, ctx):
       dprint("visitCaseBlock")
-      #printCtx(ctx,5)
 
-      ###Don't forget TRY_PUSH here!###
       # Should have placeholder that is replaced with address out of switch/case(to jump out)
       placeholderAddr = 1337
       defalutAddr = None
@@ -420,7 +384,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
       
       for child in ctx.children:
           if(not isinstance(child, antlr4.tree.Tree.TerminalNodeImpl)): # Skip "{ and }"            
-              #VARNING, fulhack
+              #VARNING, fulhack incoming
               if(isinstance(child.children[1], antlr4.tree.Tree.TerminalNodeImpl)):
                   caseVal = child.children[1].symbol.text
               else:
@@ -454,6 +418,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#objectLiteral.
   def visitObjectLiteral(self, ctx):
       dprint("visitObjectLiteral")
+      printCtx(ctx)
       i = 0
       for child in ctx.children:
           if not isinstance(child, antlr4.tree.Tree.TerminalNodeImpl):
@@ -519,10 +484,9 @@ class BytecodeVisitor(ECMAScriptVisitor):
       dprint("visitCatchProduction")
       err = ctx.children[2].accept(self) # tha variable
       #print("error variable is: ", err)
-      self.add_instruction(OpCode.STORE, err) #we are here and want to kinda do this wihtout ruining this variable if it existed before. Need a nice solution to save either store the variable in a tmp var while the catch-block is running or we need to change something in how Environment operates so it does not give an python-exception. Or somehow have a local variable for err.
+      self.add_instruction(OpCode.STORE, err)
       
       ctx.children[4].accept(self) # tha code to run
-
 
 
   # Visit a parse tree produced by ECMAScriptParser#copntinueStatement.
@@ -613,11 +577,9 @@ class BytecodeVisitor(ECMAScriptVisitor):
   def visitPropertyExpressionAssignment(self, ctx):
     dprint("visitPropertyExpressionAssignment")
     ctx.children[2].accept(self)
-    name = ctx.children[0].accept(self)
+    name = ctx.children[0].accept(self) #could be anything, but get and set are special
     if(name != None):
-      self.add_instruction(OpCode.PUSH, name)
-      
-
+        self.add_instruction(OpCode.PUSH, name)
 
   # Visit a parse tree produced by ECMAScriptParser#assignmentOperator.
   def visitAssignmentOperator(self, ctx):
@@ -661,10 +623,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#identifierName.  
   def visitIdentifierName(self, ctx):
     dprint("visitIdentifierName")
-    #printCtx(ctx)
     return ctx.children[0].accept(self)
     
-
 
   # Visit a parse tree produced by ECMAScriptParser#BinaryExpression.
   def visitBinaryExpression(self, ctx):
@@ -674,8 +634,7 @@ class BytecodeVisitor(ECMAScriptVisitor):
     if(op == '&&'):
         placeholderAddr = 1337
         ctx.children[0].accept(self)
-        #INTENDERINGSPROBELM: VI HAR INTE TEstat om && eller || funkar än men tror att de borde funka nu.
-        #Vi är på tests 07_normal_order
+
         if1 = self.program.current_index()
         self.add_instruction(OpCode.UNLESSJMP, placeholderAddr) # if false
         ctx.children[2].accept(self)
@@ -768,6 +727,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#PropertyGetter.
   def visitPropertyGetter(self, ctx):
     dprint("visitPropertyGetter")
+    printCtx(ctx)
+
     func_code = Code()
     bv = BytecodeVisitor(func_code)
     ctx.children[5].accept(bv)
@@ -867,7 +828,6 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#formalParameterList.
   def visitFormalParameterList(self, ctx):
     dprint("visitFormalParameterList")
-    #printCtx(ctx)
     args = []
     for c in reversed(ctx.children):
         #if(c.symbol.type == ECMAScriptParser.Lexer.Identifier): WHERE DID IDENTIFIER GO?
