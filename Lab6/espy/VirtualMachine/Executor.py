@@ -28,9 +28,8 @@ class Executor:
     self.environment.defineVariable("Math", MathModule())
     self.environment.defineVariable("Object", ObjectModule())
 
-    self.stack  = Stack()
+    self.stack = self.exceptionStack = Stack()
     self.current_index = 0;
-    self.exceptionStack = Stack();
 
     # The following code acts as a switch statements for OpCodes
     self.opmaps  = {}
@@ -387,8 +386,10 @@ class Executor:
     Execute the THROW instruction
     '''
     if self.exceptionStack.size() > 0:
+      exceptionObject = self.exceptionStack.pop()
       exceptionAddress = self.exceptionStack.pop()
       self.current_index = exceptionAddress - 1
+      self.stack.push(exceptionObject)
     else:
       topStack = self.stack.pop()
       raise ESException(topStack)

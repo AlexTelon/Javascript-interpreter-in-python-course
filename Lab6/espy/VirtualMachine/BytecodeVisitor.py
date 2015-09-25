@@ -54,7 +54,9 @@ def dprint(*string):
         for s in string:
             print(s, end="")
             print(" ", end="")
-        print("")
+
+
+
 
 # def console(value):
 #     print(value)
@@ -64,6 +66,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   def __init__(self, program):
     self.program    = program
     self.lineno = 0
+    self.tmpStack = Stack();
+
   def add_instruction(self, opcode, *arguments):
     inst = Instruction(opcode, *arguments)
     dprint("add_instruction:", self.lineno, ":", opcode, arguments)
@@ -183,14 +187,12 @@ class BytecodeVisitor(ECMAScriptVisitor):
   def visitWhileStatement(self, ctx):
       dprint("visitWhileStatement")
 
+      #self.add_instruction(OpCode.POP_TO_VAL, exceptionAddr)
+
+      tmpStackSize = self.tmpStack.size()
+      
       # check condition and jump over if false
       placeholderAddr = 1337
-
-      breakAddr = self.program.current_index()      
-      self.add_instruction(OpCode.TRY_PUSH, placeholderAddr)
-
-      continueStart = self.program.current_index()      
-      self.add_instruction(OpCode.TRY_PUSH, continueStart)
 
       whileStart = self.program.current_index()
       ctx.children[2].accept(self) # True/False value paused to stack 
@@ -200,11 +202,25 @@ class BytecodeVisitor(ECMAScriptVisitor):
       # code to run
       ctx.children[4].accept(self)
       self.add_instruction(OpCode.JMP, whileStart)
-      
+
       exitWhileAddr = self.program.current_index()
-      self.program.modify_instruction_arg(unlessJmpAddr, exitWhileAddr)
-      self.program.modify_instruction_arg(breakAddr, exitWhileAddr)
-      
+
+      # used to find out how many breaks and continues have been added in between
+      tmpJumpsAdded = self.tmpStack.size() - tmpStackSize
+      for i in range(tmpJumpsAdded):
+          jump = self.tmpStack.pop()
+          addr = self.program.get_instruction_arg(jump)
+          addr = addr[0]
+          if (addr == 6000): #a break
+              self.program.modify_instruction_arg(jump, exitWhileAddr)
+              pass
+          elif (addr == 7000): #a continue
+              self.program.modify_instruction_arg(jump, whileStart)
+          else:
+              pass
+              #ShouldNotHappenException
+      self.program.modify_instruction_arg(unlessJmpAddr, exitWhileAddr)            
+
 
   # Visit a parse tree produced by ECMAScriptParser#returnStatement.
   def visitReturnStatement(self, ctx):
@@ -290,6 +306,8 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#ForStatement.
   def visitForStatement(self, ctx):
       dprint("visitForStatement")
+      print("For statement is broken due to while fix, U said only to fix while");
+      return;
       # [0] = for, [1] = (, [2] = assignment/starting value, [3] = ;, 
       # [4] = end condition, [5] = ; , [6] = change of var or whatever
       # [7] = ), [8] = block
@@ -438,8 +456,12 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#breakStatement.
   def visitBreakStatement(self, ctx):
       dprint("visitBreakStatement")
-      self.add_instruction(OpCode.TRY_POP)
-      self.add_instruction(OpCode.THROW)
+      tmpAddr = 6000
+      self.tmpStack.push(self.program.current_index())
+      self.add_instruction(OpCode.JMP, tmpAddr)
+
+      #self.add_instruction(OpCode.TRY_POP)
+      #self.add_instruction(OpCode.THROW)
 
   # Visit a parse tree produced by ECMAScriptParser#ifStatement.
   def visitIfStatement(self, ctx):
@@ -492,7 +514,10 @@ class BytecodeVisitor(ECMAScriptVisitor):
   # Visit a parse tree produced by ECMAScriptParser#copntinueStatement.
   def visitContinueStatement(self, ctx):
       dprint("visitContinueStatement")
-      self.add_instruction(OpCode.THROW)
+      tmpAddr = 7000
+      self.tmpStack.push(self.program.current_index())
+      self.add_instruction(OpCode.JMP, tmpAddr)
+      #      self.add_instruction(OpCode.THROW)
 
   # Visit a parse tree produced by ECMAScriptParser#caseClause.
   def visitCaseClause(self, ctx):

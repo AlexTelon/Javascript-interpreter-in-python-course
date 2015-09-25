@@ -19,6 +19,13 @@ class Code:
     #print("changed arg to: ", list(arg))
     self.instructions[lineno].params = list(arg)
 
+  def get_instruction_arg(self, lineno):
+    '''
+    Convenience function to modify an instruction to the program
+    '''
+    return self.instructions[lineno].params
+
+
   def current_index(self):
     '''
     Return the current index, for use in jump instructions, for instnace.
